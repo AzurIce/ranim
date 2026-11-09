@@ -1,0 +1,9 @@
+{% extends "layouts/three-col" %}
+{% block content %}
+  <article class="markdown-body examples-article">
+    {% include "components/breadcrumbs" %}
+    {{page.html | safe}}
+    {% include "components/cards" %}
+    <div class="examples-list">{{<example_cards directory={directory} site={site}/>}}</div>
+  </article>
+{% endblock content %}

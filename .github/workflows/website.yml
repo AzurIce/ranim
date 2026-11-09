@@ -22,6 +22,9 @@ jobs:
   build-website:
     runs-on: ubuntu-22.04
     if: github.repository == 'AzurIce/ranim'
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 2
     steps:
       - uses: jlumbroso/free-disk-space@main
         with:
@@ -76,13 +79,13 @@ jobs:
 
       - name: Build website with the locked Notist flake
         run: |
-          nix build .#notist --out-link target/notist
+          nix build .#notist --no-update-lock-file --max-jobs 1 --cores 2 --out-link target/notist
           NOTIST="$PWD/target/notist/bin/notist" just website
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v1.0.7
         with:
-          path: ./dist/ranim-website
+          path: ./notist-output/ranim-website
 
   deploy-website:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

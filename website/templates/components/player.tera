@@ -1,0 +1,24 @@
+<sl-tab-group>
+  {% if example.output_files %}<sl-tab slot="nav" panel="preview">Preview</sl-tab>{% endif %}
+  {% if example.wasm %}<sl-tab slot="nav" panel="app">App</sl-tab>{% endif %}
+  {% if example.output_files %}
+    <sl-tab-panel name="preview">
+      {% for output in example.output_files %}
+        {% if output.kind is starting_with(pat='video/') %}<video controls><source src="{{output.url}}" type="{{output.kind}}">您的浏览器不支持视频标签。</video>
+        {% else %}<img src="{{output.url}}" alt="{{example.name}} 示例输出">{% endif %}
+      {% endfor %}
+    </sl-tab-panel>
+  {% endif %}
+  {% if example.wasm %}
+    <sl-tab-panel name="app">
+      <div class="ranim-preview">
+        <ranim-viewport src="{{url(path='examples/' ~ example.name ~ '/pkg/ranim_example.js')}}"></ranim-viewport>
+        <ranim-controls></ranim-controls>
+      </div>
+    </sl-tab-panel>
+  {% endif %}
+</sl-tab-group>
+{% for source in example.sources %}
+<p><code>{{source.name}}</code>（{{source.label}}）</p>
+<pre><code class="language-rust">{{source.code}}</code></pre>
+{% endfor %}

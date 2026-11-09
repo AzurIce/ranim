@@ -3,7 +3,7 @@
 The Notist SSG website owns two independent Web Components: `<ranim-viewport>` in
 `static/ranim-viewport.js` and `<ranim-controls>` in `static/ranim-controls.js`.
 The **App** tab composes their live WebGPU canvas and playback controls;
-**Preview** shows prerendered media. Handlebars partials live
+**Preview** shows prerendered media. Tera components live
 in `templates/components/`. The site is built as the `ranim-website` Notist project;
 templates use document attributes and the directory tree.
 
@@ -32,7 +32,7 @@ cargo examples build
 just website
 ```
 
-The output is `dist/ranim-website/`. Every Notist Site build generates example pages
+The output is `notist-output/ranim-website/`. Every Notist Site build generates example pages
 and data through `cargo examples site`. `just website` also works without a WASM
 build; the App tab appears only when both JS and WASM packages exist. Preview
 media is resolved from tracked shadow refs without local downloads or credentials.
@@ -51,24 +51,27 @@ its package is available.
 ## Site structure
 
 The repository-root `Notist.toml` declares a workspace with the `book/` and
-`website/` member projects. `website/Notist.toml` declares the `ranim-website`
-project and its `[[site]]` target. From the repository root, use
+`website/` member packages. `website/Notist.toml` declares the `ranim-website`
+package and its `[site]`. From the repository root, use
 `notist build -p ranim-website` or `notist serve -p ranim-website`; inside
 `website/`, `notist build` and `notist serve` select this project automatically.
 `just publications` builds both projects, with the Book output in
-`dist/ranim-book/`. The two publications retain their independent deployment
+`notist-output/ranim-book/`. The two publications retain their independent deployment
 URLs; workspace membership does not combine their pages or configuration.
 
 Documents under `content/` keep their
 relative paths, with the extension changed to `.html`; `index.md` provides a
 directory's landing page. Metadata uses Notist root annotations.
-`templates/*.hbs` and `templates/components/*.hbs` render document attributes,
+`templates/*.tera` and `templates/components/*.tera` render document attributes,
 the directory tree and `site.data`; `sass/` compiles to CSS and `static/` is
 copied to the output root. Deployment uses the configured
 `https://azurice.github.io/ranim/` prefix; local preview uses `/`.
 
-The Experimental `prepare` extension configured in `[[site.extensions]]` invokes
-`cargo examples site` through JSON stdio, from the website directory. It reads
+The extension configured in `[site.extensions.examples]` invokes
+`cargo examples site` through build-scoped JSON Lines (protocol version 2), from
+the website directory. One process handles `before_compile` (documents only) and
+`before_template` (final pages and template data; only data may be changed),
+flushing each response before waiting for the next event. It reads
 the workspace `[[example]]` targets, `scenes.rs`, `main.rs`, and README files to
 create `examples/<group>/<name>.md`, group indexes, and `site.data.<name>` in
 memory. `examples/` belongs to the extension; put authored documents elsewhere

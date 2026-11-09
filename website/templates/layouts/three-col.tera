@@ -1,0 +1,17 @@
+{% extends "layouts/base" %}
+{% block body %}
+  <aside class="side left">
+    <nav class="outline" aria-label="Examples">
+      <div class="outline__content"><ul>
+        {% include "components/navigation" %}
+        {{<example_navigation directory={site.directories.examples} site={site} page={page}/>}}
+      </ul></div>
+    </nav>
+  </aside>
+  <div class="content container">{% block content %}{% endblock content %}</div>
+  <aside class="side right">
+    <nav class="outline" aria-label="On this page"><div class="outline__content"><ul>
+      {% for heading in page.headings %}<li><a class="outline-item" href="#{{heading.anchor}}">{{heading.title}}</a></li>{% endfor %}
+    </ul></div></nav>
+  </aside>
+{% endblock body %}

@@ -1,0 +1,20 @@
+{% component example_cards(directory, site) %}
+{% for path in directory.directories %}
+  {% set child = site.directories[path] %}
+    <section class="example-group">
+      <h2 class="example-group__title">{% if child.index %}<a href="{{url(path=child.index.route.url)}}">{{child.index.title}}</a>{% else %}{{child.name}}{% endif %}</h2>
+      {{<example_cards directory={child} site={site}/>}}
+    </section>
+{% endfor %}
+{% if directory.pages %}<div class="card-grid">
+  {% for entry in directory.pages %}
+    <a href="{{url(path=entry.route.url)}}" class="card">
+      {% set example = site.data[entry.attrs.example] %}
+      {% if example.preview_imgs %}<div class="preview-grid">
+        {% for image in example.preview_imgs %}<img src="{{url(path=image)}}" alt="{{example.name}} 示例输出 {{loop.index0}}" loading="lazy">{% endfor %}
+      </div>{% else %}<div class="card__placeholder" aria-hidden="true">▶</div>{% endif %}
+      <div class="card__content"><h2>{{entry.title}}</h2>{% if entry.attrs.description %}<p>{{entry.attrs.description}}</p>{% endif %}</div>
+    </a>
+  {% endfor %}
+</div>{% endif %}
+{% endcomponent example_cards %}

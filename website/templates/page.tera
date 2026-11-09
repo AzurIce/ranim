@@ -1,0 +1,4 @@
+{% extends "layouts/three-col" %}
+{% block content %}
+  <article class="markdown-body">{{page.html | safe}}</article>
+{% endblock content %}

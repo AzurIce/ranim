@@ -31,6 +31,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +56,7 @@ jobs:
           fi
           if [ -f Notist.toml ] && [ -f book/Notist.toml ]; then
             echo "workspace=true" >> "$GITHUB_OUTPUT"
-            echo "book-output=dist/ranim-book" >> "$GITHUB_OUTPUT"
+            echo "book-output=notist-output/ranim-book" >> "$GITHUB_OUTPUT"
           else
             echo "workspace=false" >> "$GITHUB_OUTPUT"
             echo "book-output=book/build" >> "$GITHUB_OUTPUT"
@@ -67,11 +70,13 @@ jobs:
         if: steps.format.outputs.notist == 'true'
         run: |
           mkdir -p target
-          nix build .#notist --out-link target/notist
+          nix build .#notist --no-update-lock-file --max-jobs 1 --cores 2 --out-link target/notist
           if [ "${{ steps.format.outputs.workspace }}" = "true" ]; then
             target/notist/bin/notist build -p ranim-book
+          elif target/notist/bin/notist build --help >/dev/null 2>&1; then
+            target/notist/bin/notist build --config book/Notist.toml --out-dir book/build
           else
-            # Older Notist revisions still use the standalone book configuration.
+            # Historical tags use their own locked CLI, which may predate build.
             target/notist/bin/notist book build book --out-dir book/build
           fi
 
@@ -147,3 +152,4 @@ jobs:
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ steps.format.outputs.book-output }}
+          if-no-files-found: error

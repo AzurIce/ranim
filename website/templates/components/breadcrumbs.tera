@@ -1,0 +1,10 @@
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="{{url(path='/')}}">Ranim</a>
+  {% for path in page.ancestors %}
+    {% if path and site.directories[path].index %}
+      {% set ancestor = site.directories[path].index %}
+      <span class="breadcrumbs__sep">/</span><a href="{{url(path=ancestor.route.url)}}">{{ancestor.title}}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page.route.output != 'index.html' %}<span class="breadcrumbs__sep">/</span><span class="breadcrumbs__current">{{page.title}}</span>{% endif %}
+</nav>

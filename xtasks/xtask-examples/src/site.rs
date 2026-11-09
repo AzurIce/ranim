@@ -1,4 +1,4 @@
-//! Ranim's experimental Notist SSG prepare command. Pages and template data are
+//! Ranim's build-scoped Notist SSG command. Pages and template data are
 //! generated from Cargo, source files, render provenance and published refs.
 use crate::{
     Example, OutputFile, get_examples, render_state::RenderState, rewrite_readme_links,
@@ -10,12 +10,11 @@ use serde_json::Value;
 use std::{
     collections::BTreeMap,
     fs,
-    io::{Read, Write},
+    io::{BufRead, Write},
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Default)]
 struct SiteInput {
     documents: BTreeMap<String, String>,
     data: BTreeMap<String, Value>,
@@ -23,57 +22,128 @@ struct SiteInput {
 #[derive(Deserialize)]
 struct Request {
     version: u32,
-    stage: String,
     root: PathBuf,
-    input: SiteInput,
+    config: Value,
+    #[serde(flatten)]
+    event: Event,
+}
+#[derive(Deserialize)]
+#[serde(tag = "event", rename_all = "snake_case", deny_unknown_fields)]
+enum Event {
+    BeforeCompile {
+        documents: BTreeMap<String, String>,
+    },
+    BeforeTemplate {
+        pages: Vec<Value>,
+        data: BTreeMap<String, Value>,
+    },
 }
 #[derive(Serialize)]
 struct Response {
     version: u32,
+    event: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    input: Option<SiteInput>,
+    documents: Option<BTreeMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<BTreeMap<String, Value>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     errors: Vec<String>,
 }
 #[derive(Serialize)]
 struct ExampleData<'a> {
     name: &'a str,
     code: &'a str,
+    sources: Vec<SourceFile>,
     hash: &'a str,
     preview_imgs: Vec<String>,
     output_files: Vec<OutputFile>,
     wasm: bool,
 }
 
-/// Read one site request, return one response, and keep logs off stdout.
-pub fn exchange(mut reader: impl Read, mut writer: impl Write) -> Result<()> {
-    let result = (|| {
-        let mut text = String::new();
-        reader.read_to_string(&mut text)?;
-        let request: Request = serde_json::from_str(&text)?;
-        if request.version != 1 || request.stage != "prepare" {
-            bail!("unsupported site extension request");
+#[derive(Serialize)]
+struct SourceFile {
+    name: &'static str,
+    label: &'static str,
+    code: String,
+}
+
+/// Answer each JSONL event immediately; state belongs to this build only.
+pub fn exchange(mut reader: impl BufRead, mut writer: impl Write) -> Result<()> {
+    let mut generated = None;
+    let mut finished = false;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            break;
         }
-        let website = request.root.canonicalize()?;
-        let root = website.parent().context("website has no project root")?;
-        if website.file_name().is_none_or(|name| name != "website") {
-            bail!("Ranim site extension expects the website directory");
-        }
-        prepare(root, request.input)
-    })();
-    let response = match result {
-        Ok(input) => Response {
-            version: 1,
-            input: Some(input),
+        let event = serde_json::from_str::<Value>(&line)
+            .ok()
+            .and_then(|value| value["event"].as_str().map(str::to_owned))
+            .unwrap_or_else(|| "before_compile".into());
+        let mut response = Response {
+            version: 2,
+            event,
+            documents: None,
+            data: None,
             errors: vec![],
-        },
-        Err(error) => Response {
-            version: 1,
-            input: None,
-            errors: vec![format!("{error:#}")],
-        },
-    };
-    serde_json::to_writer(&mut writer, &response)?;
-    writer.flush()?;
+        };
+        let result: Result<()> = (|| {
+            if !line.ends_with('\n') {
+                bail!("site extension request must end with a newline");
+            }
+            let request: Request = serde_json::from_str(&line)?;
+            if request.version != 2 {
+                bail!("unsupported site extension request version");
+            }
+            // The host owns config and final Pages; this extension changes
+            // only sources and its generated template data.
+            let _config = request.config;
+            let website = request.root.canonicalize()?;
+            let root = website.parent().context("website has no project root")?;
+            if website.file_name().is_none_or(|name| name != "website") {
+                bail!("Ranim site extension expects the website directory");
+            }
+            match request.event {
+                Event::BeforeCompile { documents } => {
+                    if generated.is_some() || finished {
+                        bail!("before_compile must occur once before before_template");
+                    }
+                    let input = prepare(
+                        root,
+                        SiteInput {
+                            documents,
+                            data: BTreeMap::new(),
+                        },
+                    )?;
+                    generated = Some((website, input.data));
+                    response.documents = Some(input.documents);
+                }
+                Event::BeforeTemplate { pages, mut data } => {
+                    let (prepared_root, generated_data) = generated
+                        .take()
+                        .context("before_template requires before_compile in the same process")?;
+                    if prepared_root != website {
+                        bail!("site root changed between events");
+                    }
+                    let _pages = pages;
+                    data.extend(generated_data);
+                    response.data = Some(data);
+                    finished = true;
+                }
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            response.errors.push(format!("{error:#}"));
+        }
+        serde_json::to_writer(&mut writer, &response)?;
+        writer.write_all(b"\n")?;
+        writer.flush()?;
+        if !response.errors.is_empty() {
+            break;
+        }
+    }
     Ok(())
 }
 
@@ -116,6 +186,16 @@ fn prepare(root: &Path, mut input: SiteInput) -> Result<SiteInput> {
         let data = ExampleData {
             name: &example.name,
             code: &example.code,
+            sources: [("scenes.rs", "共享场景与项目装配"), ("main.rs", "平台入口")]
+                .into_iter()
+                .map(|(name, label)| {
+                    Ok(SourceFile {
+                        name,
+                        label,
+                        code: fs::read_to_string(example.path.with_file_name(name))?,
+                    })
+                })
+                .collect::<Result<_>>()?,
             hash: state
                 .hashes
                 .get(&example.name)
@@ -254,8 +334,16 @@ path = "examples/hidden/main.rs"
 
         fn request(&self) -> Value {
             serde_json::json!({
-                "version": 1, "stage": "prepare", "root": self.0.join("website"),
-                "config": {}, "input": {"documents": {"index.md": "Home"}, "data": {}}
+                "version": 2, "event": "before_compile", "root": self.0.join("website"),
+                "config": {}, "documents": {"index.md": "Home"}
+            })
+        }
+
+        fn template_request(&self) -> Value {
+            serde_json::json!({
+                "version": 2, "event": "before_template", "root": self.0.join("website"),
+                "config": {}, "pages": [{"title": "Final title", "html": "<p>Final</p>"}],
+                "data": {"custom": {"value": 42}, "earlier-extension": {"ready": true}}
             })
         }
     }
@@ -293,6 +381,13 @@ path = "examples/hidden/main.rs"
                 .unwrap()
                 .contains("pub fn original()")
         );
+        let sources = result.data["foo"]["sources"].as_array().unwrap();
+        assert_eq!(sources.len(), 2);
+        assert_eq!(sources[0]["name"], "scenes.rs");
+        assert_eq!(sources[0]["label"], "共享场景与项目装配");
+        assert_eq!(sources[0]["code"], "pub fn original() {}\n");
+        assert_eq!(sources[1]["name"], "main.rs");
+        assert_eq!(sources[1]["code"], "mod scenes; fn main() {}\n");
         assert_eq!(
             result.data["foo"]["preview_imgs"].as_array().unwrap().len(),
             1
@@ -394,56 +489,187 @@ path = "examples/hidden/main.rs"
         );
     }
 
-    #[test]
-    fn stdio_returns_complete_input_and_reports_protocol_and_source_errors() {
-        let fixture = Fixture::new();
-        let request = fixture.request();
+    fn responses(requests: &[Value]) -> Vec<Value> {
+        let mut input = vec![];
+        for request in requests {
+            serde_json::to_writer(&mut input, request).unwrap();
+            input.push(b'\n');
+        }
         let mut output = vec![];
-        exchange(
-            serde_json::to_vec(&request).unwrap().as_slice(),
-            &mut output,
-        )
-        .unwrap();
-        let response: Value = serde_json::from_slice(&output).unwrap();
-        assert_eq!(response["errors"], serde_json::json!([]));
-        assert_eq!(response["input"]["documents"]["index.md"], "Home");
+        exchange(input.as_slice(), &mut output).unwrap();
+        assert!(output.ends_with(b"\n"));
+        String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn jsonl_events_return_only_stage_outputs_and_preserve_prior_template_data() {
+        let fixture = Fixture::new();
+        let output = responses(&[fixture.request(), fixture.template_request()]);
+        assert_eq!(output.len(), 2);
+        assert_eq!(output[0]["version"], 2);
+        assert_eq!(output[0]["event"], "before_compile");
+        assert_eq!(output[0]["documents"]["index.md"], "Home");
+        assert!(
+            output[0]["documents"]
+                .get("examples/geometry/foo.md")
+                .is_some()
+        );
+        assert!(output[0].get("data").is_none());
+        assert!(output[0].get("input").is_none());
+        assert_eq!(output[1]["version"], 2);
+        assert_eq!(output[1]["event"], "before_template");
+        assert_eq!(output[1]["data"]["custom"]["value"], 42);
+        assert_eq!(output[1]["data"]["earlier-extension"]["ready"], true);
+        assert_eq!(output[1]["data"]["foo"]["sources"][0]["name"], "scenes.rs");
+        assert!(output[1].get("documents").is_none());
+        assert!(output[1].get("pages").is_none());
+        assert!(
+            output
+                .iter()
+                .all(|response| response.get("errors").is_none())
+        );
+    }
+
+    #[test]
+    fn jsonl_rejects_wrong_versions_unknown_events_and_cross_stage_fields() {
+        let fixture = Fixture::new();
         for (field, value) in [
-            ("version", serde_json::json!(2)),
+            ("version", serde_json::json!(1)),
+            ("event", serde_json::json!("prepare")),
             ("stage", serde_json::json!("render")),
+            ("data", serde_json::json!({})),
+            ("pages", serde_json::json!([])),
         ] {
-            let mut invalid = request.clone();
+            let mut invalid = fixture.request();
             invalid[field] = value;
-            output.clear();
-            exchange(
-                serde_json::to_vec(&invalid).unwrap().as_slice(),
-                &mut output,
-            )
-            .unwrap();
-            let response: Value = serde_json::from_slice(&output).unwrap();
-            assert!(response.get("input").is_none());
+            let output = responses(&[invalid, fixture.template_request()]);
+            assert_eq!(output.len(), 1, "{field}");
+            assert!(output[0].get("documents").is_none(), "{field}");
+            assert!(output[0].get("data").is_none(), "{field}");
             assert!(
-                response["errors"][0]
-                    .as_str()
-                    .unwrap()
-                    .contains("unsupported")
+                !output[0]["errors"][0].as_str().unwrap().is_empty(),
+                "{field}"
             );
         }
+        let mut invalid = fixture.template_request();
+        invalid["documents"] = serde_json::json!({});
+        let output = responses(&[fixture.request(), invalid]);
+        assert!(
+            output[1]["errors"][0]
+                .as_str()
+                .unwrap()
+                .contains("unknown field")
+        );
+    }
+
+    #[test]
+    fn jsonl_rejects_invalid_event_order_and_changed_root() {
+        let fixture = Fixture::new();
+        for requests in [
+            vec![fixture.template_request()],
+            vec![fixture.request(), fixture.request()],
+            vec![
+                fixture.request(),
+                fixture.template_request(),
+                fixture.template_request(),
+            ],
+            vec![
+                fixture.request(),
+                fixture.template_request(),
+                fixture.request(),
+            ],
+        ] {
+            let output = responses(&requests);
+            assert!(output.last().unwrap()["errors"][0].is_string());
+        }
+        let other = Fixture::new();
+        let output = responses(&[fixture.request(), other.template_request()]);
+        assert!(
+            output[1]["errors"][0]
+                .as_str()
+                .unwrap()
+                .contains("root changed")
+        );
+    }
+
+    #[test]
+    fn jsonl_reports_source_errors_and_rejects_unframed_or_malformed_requests() {
+        let fixture = Fixture::new();
         fixture.write(
             ".shadow/refs/website/static/examples/foo/preview.png.ref",
             "oid = \"invalid\"",
         );
-        output.clear();
-        exchange(
-            serde_json::to_vec(&request).unwrap().as_slice(),
-            &mut output,
-        )
-        .unwrap();
-        let response: Value = serde_json::from_slice(&output).unwrap();
+        let output = responses(&[fixture.request(), fixture.template_request()]);
+        assert_eq!(output.len(), 1);
         assert!(
-            response["errors"][0]
+            output[0]["errors"][0]
                 .as_str()
                 .unwrap()
                 .contains("unsupported oid")
+        );
+        for input in [
+            serde_json::to_vec(&fixture.request()).unwrap(),
+            b"not json\n".to_vec(),
+        ] {
+            let mut output = vec![];
+            exchange(input.as_slice(), &mut output).unwrap();
+            let response: Value = serde_json::from_slice(&output).unwrap();
+            assert!(response["errors"][0].is_string());
+            assert!(response.get("documents").is_none());
+            assert!(response.get("data").is_none());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn jsonl_flushes_before_eof_and_retains_one_build_snapshot() {
+        use std::{io::BufReader, net::Shutdown, os::unix::net::UnixStream, time::Duration};
+
+        let fixture = Fixture::new();
+        let (mut host, worker) = UnixStream::pair().unwrap();
+        host.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let mut reader = BufReader::new(host.try_clone().unwrap());
+        let thread = std::thread::spawn(move || {
+            exchange(BufReader::new(worker.try_clone().unwrap()), worker).unwrap();
+        });
+        serde_json::to_writer(&mut host, &fixture.request()).unwrap();
+        host.write_all(b"\n").unwrap();
+        host.flush().unwrap();
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let first: Value = serde_json::from_str(&line).unwrap();
+        assert!(first.get("errors").is_none(), "{first}");
+        assert!(first["documents"].get("examples/geometry/foo.md").is_some());
+
+        // The second event uses data captured while compiling, not a fresh
+        // discovery that could disagree with the compiled sources.
+        fixture.write(
+            "examples/geometry/foo/scenes.rs",
+            "pub fn changed_between_events() {}\n",
+        );
+        serde_json::to_writer(&mut host, &fixture.template_request()).unwrap();
+        host.write_all(b"\n").unwrap();
+        host.flush().unwrap();
+        line.clear();
+        reader.read_line(&mut line).unwrap();
+        let second: Value = serde_json::from_str(&line).unwrap();
+        assert!(second.get("errors").is_none(), "{second}");
+        assert_eq!(
+            second["data"]["foo"]["sources"][0]["code"],
+            "pub fn original() {}\n"
+        );
+        host.shutdown(Shutdown::Write).unwrap();
+        line.clear();
+        assert_eq!(reader.read_line(&mut line).unwrap(), 0);
+        thread.join().unwrap();
+        let next_build = responses(&[fixture.request(), fixture.template_request()]);
+        assert_eq!(
+            next_build[1]["data"]["foo"]["sources"][0]["code"],
+            "pub fn changed_between_events() {}\n"
         );
     }
 

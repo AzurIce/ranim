@@ -48,9 +48,11 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
 
 `website/static/examples/` 下的渲染产物（mp4/png）**不入库**，由
 [shadow](https://github.com/AzurIce/shadow) 管理：xtask 在渲染后运行
-`shadow publish` 上传到 TOS。SSG 构建时通过 Experimental prepare 扩展
+`shadow publish` 上传到 TOS。SSG 构建时通过站点扩展
 `cargo examples site` 从 Cargo targets、源码、README 和 `.shadow/refs/` 生成
-内存中的页面与模板数据，媒体 URL 由 refs 中的 oid 解析。
+内存中的页面与模板数据，媒体 URL 由 refs 中的 oid 解析。命令使用构建级 JSONL
+协议：before_compile 返回源码，before_template 合并模板数据；两事件共享同一进程，
+每次响应立即 flush，不等待 EOF。
 入库的是 ref、`shadow.toml` 和 `website/render-state.json`（上次成功渲染的 hash）；
 不再维护 `website/data/*.toml` 或 `website/content/examples/`。
 

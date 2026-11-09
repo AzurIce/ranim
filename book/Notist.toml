@@ -1,14 +1,20 @@
-[project]
+[package]
 name = "ranim-book"
 
-[[book]]
-name = "ranim-book"
+[site]
 title = "Ranim Book"
+content = "."
+theme = "builtins.book"
+directory_urls = true
+copy_content_assets = false
 exclude = ["**/AGENTS.md", "_components/**"]
-additional-css = ["version-select.css"]
-additional-js = ["version-select.js"]
+styles = ["version-select.css"]
+scripts = ["version-select.js"]
 
-[[book.extensions]]
+[site.extensions.builtins.book]
+select = true
+
+[[extensions]]
 kind = "replace"
 imports = { typst = "_components/typst/lib.notc" }
 from = "notist.math"

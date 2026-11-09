@@ -1,0 +1,12 @@
+{% component example_navigation(directory, site, page) %}
+{% for path in directory.directories %}
+  {% set child = site.directories[path] %}
+    <li>
+      {% if child.index %}<a href="{{url(path=child.index.route.url)}}" class="outline-item {% if page.route.path == child.index.route.path %}active{% endif %}">{{child.index.title}}</a>{% else %}<span>{{child.name}}</span>{% endif %}
+      <ul class="outline__nested">{{<example_navigation directory={child} site={site} page={page}/>}}</ul>
+    </li>
+{% endfor %}
+{% for entry in directory.pages %}
+  <li><a href="{{url(path=entry.route.url)}}" class="outline-item {% if page.route.path == entry.route.path %}active{% endif %}">{{entry.title}}</a></li>
+{% endfor %}
+{% endcomponent example_navigation %}

@@ -10,9 +10,9 @@ README，无需维护或提交 `website/content/examples/`、`website/data/*.tom
 
 ```text
 Cargo.toml + examples/**/{scenes.rs,main.rs,README.md}
-    → cargo examples site（prepare 阶段，JSON stdio）
+    → cargo examples site（before_compile / before_template，JSONL）
     → 内存中的 examples/<group>/<name>.md + site.data.<name>
-    → Notist 解析、模板渲染 → dist/ranim-website/
+    → Notist 解析、模板渲染 → notist-output/ranim-website/
 
 .shadow/refs/ + shadow.toml → 已发布媒体 URL
 website/render-state.json → 上次成功渲染的源码 hash
@@ -81,7 +81,7 @@ cargo examples build arc gltf_showcase
 # 第二步：开发预览（也监听 Cargo 配置、例子源码、README 和 shadow refs）
 notist serve -p ranim-website
 
-# 或生成 dist/ranim-website/；发布前先用 cargo examples build 构建全部例子
+# 或生成 notist-output/ranim-website/；发布前先用 cargo examples build 构建全部例子
 just website
 ```
 
@@ -103,18 +103,19 @@ shadow refs，不需要本地下载媒体或 shadow 凭证。README 引用的本
 和渲染记录，不提交静态媒体、生成的页面或模板数据。
 
 根 `Notist.toml` 声明 Book 与 Website 两个 workspace 成员；扩展配置位于
-`website/Notist.toml` 的 `[[site.extensions]]`。Notist 仍从站点目录
-启动 `cargo examples site`，通过 stdin 传入 `version: 1`、`stage: "prepare"`、
-`root`、`config` 和 `input: {documents, data}`；命令 stdout 返回
-`{version: 1, input: {documents, data}, errors: []}`，日志走 stderr。扩展保留其他
-页面和数据，重建 `examples/` 文档与各例子的数据键。`watch` 额外监听项目输入，
+`website/Notist.toml` 的 `[site.extensions.examples]`。Notist 从站点目录
+启动 `cargo examples site`，同次构建复用一个进程，以协议 `version: 2` 交换 JSON Lines。
+`before_compile` 接收并返回 `documents`；`before_template` 接收最终 `pages` 和前序扩展
+修改后的 `data`，只返回合并后的 `data`。每行响应携带相同的 `version` / `event`，
+写入后立即 flush，不等待 stdin EOF；日志走 stderr。扩展在构建内保存生成的数据，
+保留其他页面和数据，重建 `examples/` 文档与各例子的数据键。`watch` 额外监听项目输入，
 所以修改例子、Cargo 配置或媒体 refs 会在开发服务器中重新生成页面。
 协议仍为 Experimental，随 Notist 固定版本更新。
 
 示例页通过 `@!(template: "example", example: "<name>")` 声明模板和数据键。
 列表页和样例页左侧导航按生成的目录层级渲染；嵌套 example 的页面带
 `Examples / <group> / <name>` 面包屑。
-Handlebars 局部模板在 `website/templates/components/` 中，`player.hbs` 输出共享的
+Tera 组件模板在 `website/templates/components/` 中，`player.tera` 输出共享的
 `<ranim-viewport>` 与 `<ranim-controls>` Web Components，显式绑定后组合展示。
 
 `just doc-examples` 会为 `ranim-examples` 生成带 `#[wasm_demo_doc]` 实时预览的

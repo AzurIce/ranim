@@ -1,3 +1,2 @@
 [workspace]
 members = ["book", "website"]
-dist = "dist"

@@ -25,7 +25,7 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Prepare example pages and data for Notist SSG over JSON stdio.
+    /// Generate example pages and data through Notist SSG JSON Lines events.
     Site,
     /// Build individual WASM examples for the website or rustdoc.
     Build {

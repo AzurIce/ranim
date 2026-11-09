@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{site.title}}: {{page.title}}</title>
+  <link rel="stylesheet" href="{{url(path='index.css')}}">
+  <link rel="stylesheet" href="{{url(path='github-markdown.css')}}">
+  <link rel="stylesheet" href="{{assets.highlight}}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{url(path='apple-touch-icon.png')}}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{url(path='favicon-32x32.png')}}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{url(path='favicon-16x16.png')}}">
+  <link rel="manifest" href="{{url(path='site.webmanifest')}}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+  <script type="module" src="{{url(path='site.js')}}"></script>
+</head>
+<body class="layout">
+  <header class="layout__header">
+    <div class="back"></div>
+    <nav class="nav">
+      <a href="{{url(path='/')}}" class="home nav-btn"><img src="{{url(path='ranim.png')}}" alt="Ranim Icon"><span>Ranim</span></a>
+      <a href="https://azurice.github.io/ranim-book/main/" class="section-btn nav-btn" rel="noopener noreferrer" target="_blank">指南 ↗</a>
+      <a href="https://azurice.github.io/ranim-doc/ranim/" class="section-btn nav-btn" rel="noopener noreferrer" target="_blank">文档 ↗</a>
+      {% for path in site.directories[''].directories %}
+        {% set section = site.directories[path] %}
+        {% if section.index %}<a href="{{url(path=section.index.route.url)}}" class="section-btn nav-btn">{{section.index.title}}</a>{% endif %}
+      {% endfor %}
+      <a href="https://github.com/AzurIce/ranim" class="icon-btn nav-btn" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
+  </header>
+  <main class="layout__body">{% block body %}{% endblock body %}</main>
+  {% if assets.components %}<script type="module" src="{{assets.components}}"></script>{% endif %}
+</body>
+</html>
