@@ -1,5 +1,5 @@
 use ranim::{
-    anims::{creation::WritingAnim, morph::MorphAnim},
+    anims::{creation::Unwrite, morph::Morph},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -25,9 +25,9 @@ fn getting_started1(r: &mut RanimScene) {
 
     let content = seq![
         VItem::from(square)
-            .morph_to(VItem::from(circle.clone()))
+            .anim(Morph::to(VItem::from(circle.clone())))
             .with_rate_func(smooth),
-        VItem::from(circle).unwrite().with_rate_func(smooth),
+        VItem::from(circle).anim(Unwrite).with_rate_func(smooth),
     ];
 
     let total_secs = content.cursor_sec();

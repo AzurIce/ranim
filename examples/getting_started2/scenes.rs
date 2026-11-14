@@ -1,7 +1,7 @@
 use ranim::{
     anims::{
-        creation::{CreationAnim, WritingAnim},
-        morph::MorphAnim,
+        creation::{Create, UnCreate, Unwrite},
+        morph::Morph,
     },
     color::palettes::manim,
     items::vitem::{
@@ -33,19 +33,18 @@ fn getting_started2(r: &mut RanimScene) {
     let mut rect_sequence = seq![rect.clone().show()];
     rect_sequence
         .hold(1.0)
-        .push(VItem::from(rect).uncreate().with_rate_func(smooth));
+        .push(VItem::from(rect).anim(UnCreate).with_rate_func(smooth));
 
     let mut item_sequence = seq![square.clone().show()];
     item_sequence
         .hold(1.0)
-        .push(square.clone().create().with_rate_func(smooth))
+        .push(square.anim_ref(Create).with_rate_func(smooth))
         .push(
             square
-                .clone()
-                .morph_to(circle.clone())
+                .anim_ref(Morph::to(circle.clone()))
                 .with_rate_func(linear),
         )
-        .push(circle.clone().unwrite().with_rate_func(smooth));
+        .push(circle.anim(Unwrite).with_rate_func(smooth));
 
     let total_secs = item_sequence.cursor_sec().max(rect_sequence.cursor_sec());
     r.play(CameraFrame::default().show().with_duration(total_secs));

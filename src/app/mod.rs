@@ -9,7 +9,9 @@ use std::ops::{Deref, DerefMut};
 use bevy_app::{App, PluginsState};
 use bevy_ecs::prelude::*;
 
+mod animation;
 mod scene;
+pub use animation::{AnimationAppExt, BuiltinAnimationsPlugin};
 pub use scene::{Output, OutputFormat, Scene, SceneConfig, SceneConstructor};
 
 /// Resolve the project's rendering configuration for every session host.

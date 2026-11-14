@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::morph::Morph,
     color::{HueDirection, palettes::manim},
     glam::{DQuat, DVec3, dvec2},
     items::vitem::geometry::RegularPolygon,
@@ -52,9 +52,9 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .zip(radii.iter())
         .map(|(poly, &target_radius)| {
-            poly.morph(|p| {
+            poly.anim_mut(Morph::to(poly.clone().with(|p| {
                 p.inner.radius = target_radius;
-            })
+            })))
             .with_rate_func(smooth)
         })
         .into_lagged(0.2);
@@ -69,13 +69,13 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .zip(rotations.iter())
         .map(|(poly, &rot)| {
-            poly.morph(|p| {
+            poly.anim_mut(Morph::to(poly.clone().with(|p| {
                 p.transform = Similarity {
                     scale: 1.0,
                     rotation: DQuat::from_rotation_z(rot),
                     translation: DVec3::ZERO,
                 };
-            })
+            })))
             .with_rate_func(smooth)
         })
         .into_lagged(0.2);
@@ -93,9 +93,9 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .rev()
         .map(|poly| {
-            poly.morph(|p| {
+            poly.anim_mut(Morph::to(poly.clone().with(|p| {
                 p.inner.radius = 0.0;
-            })
+            })))
             .with_rate_func(smooth)
         })
         .into_lagged(0.2);

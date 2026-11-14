@@ -38,6 +38,8 @@ def check(features, target=None, defaults=False):
     if defaults:
         enabled |= {"anims", "items", "cmd-preview"}
     if "cmd-preview" in enabled:
+        enabled |= {"cmd-app"}
+    if "cmd-app" in enabled:
         enabled |= {"cmd-render"}
     if "cmd-render" in enabled:
         enabled |= {"render"}
@@ -51,7 +53,11 @@ def check(features, target=None, defaults=False):
         assert (package in packages) == (not target and "cmd-render" in enabled), (
             label, package
         )
-    for package in ["eframe", "egui", "rodio", "cpal"]:
+    for package in ["eframe", "egui"]:
+        assert (package in packages) == (not target and "cmd-app" in enabled), (
+            label, package
+        )
+    for package in ["rodio", "cpal"]:
         assert (package in packages) == (not target and "cmd-preview" in enabled), (
             label, package
         )
@@ -67,7 +73,7 @@ def check(features, target=None, defaults=False):
     )
 
 
-for feature_set in ["", "items", "anims", "render", "render,items", "cmd-render", "cmd-preview", "subsecond"]:
+for feature_set in ["", "items", "anims", "render", "render,items", "cmd-render", "cmd-app", "cmd-preview", "subsecond"]:
     check(feature_set)
 for feature_set, defaults in [("render", False), ("anims,render", False), ("render,subsecond", False), ("", True)]:
     check(feature_set, "wasm32-unknown-unknown", defaults)

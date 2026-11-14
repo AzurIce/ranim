@@ -228,6 +228,23 @@ where
     }
 }
 
+impl<E> crate::animation::build::Unplaced for Iterative<E>
+where
+    E: IterativeEval + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+}
+
+impl<E> crate::animation::build::IntoAnimNode for Iterative<E>
+where
+    E: IterativeEval + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+    fn into_anim_node(self) -> crate::animation::node::AnimNode {
+        crate::animation::node::AnimNode::from_eval(self, 1.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

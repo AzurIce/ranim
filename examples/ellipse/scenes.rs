@@ -1,5 +1,5 @@
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
+    anims::{creation::Write, fading::FadeOut, morph::Morph},
     color::palettes::manim,
     core::animation::eval::StaticAnim,
     glam::dvec2,
@@ -21,13 +21,17 @@ fn ellipse(r: &mut RanimScene) {
     });
     let mut vitem = VItem::from(ellipse);
 
-    let mut content = seq![vitem.write().with_rate_func(smooth)];
+    let mut content = seq![vitem.anim_mut(Write).with_rate_func(smooth)];
 
     // Transform to a circle
     let circle = Circle::new(2.0).with(|c| {
         c.set_stroke_color(manim::RED_C);
     });
-    content.push(vitem.morph_to(VItem::from(circle)).with_rate_func(smooth));
+    content.push(
+        vitem
+            .anim_mut(Morph::to(VItem::from(circle)))
+            .with_rate_func(smooth),
+    );
 
     // Transform to a vertical ellipse
     let ellipse_v = Ellipse::new(dvec2(1.0, 2.5)).with(|e| {
@@ -35,12 +39,12 @@ fn ellipse(r: &mut RanimScene) {
     });
     content.push(
         vitem
-            .morph_to(VItem::from(ellipse_v))
+            .anim_mut(Morph::to(VItem::from(ellipse_v)))
             .with_rate_func(smooth),
     );
 
     // Fade out
-    content.push(vitem.fade_out().with_rate_func(smooth));
+    content.push(vitem.anim_mut(FadeOut).with_rate_func(smooth));
 
     r.play(
         CameraFrame::default()

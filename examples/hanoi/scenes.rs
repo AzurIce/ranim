@@ -1,5 +1,5 @@
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::morph::Morph,
     color::{HueDirection, palettes::manim},
     glam::dvec3,
     items::vitem::{VItem, geometry::Rectangle},
@@ -81,27 +81,27 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         {
             let (sequence, disk) = &mut disk_entry;
             sequence.push(
-                disk.morph(|data| {
+                disk.anim_mut(Morph::to(disk.clone().with(|data| {
                     data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
-                })
+                })))
                 .with_duration(anim_duration)
                 .with_rate_func(ease_in_quad),
             );
             sequence.push(
-                disk.morph(|data| {
+                disk.anim_mut(Morph::to(disk.clone().with(|data| {
                     data.shift(dvec3(
                         (idx_dst as f64 - idx_src as f64) * rod_section_width,
                         0.0,
                         0.0,
                     ));
-                })
+                })))
                 .with_duration(anim_duration)
                 .with_rate_func(linear),
             );
             sequence.push(
-                disk.morph(|data| {
+                disk.anim_mut(Morph::to(disk.clone().with(|data| {
                     data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
-                })
+                })))
                 .with_duration(anim_duration)
                 .with_rate_func(ease_out_quad),
             );

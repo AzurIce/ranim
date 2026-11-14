@@ -26,11 +26,12 @@ use crate::animation::node::{AnimNode, LeafContent, NodeContent};
 ///
 /// ```ignore
 /// seq![
-///     square.fade_in(),
+///     square.anim_ref(FadeIn),
 ///     Sound::new(narration),          // plays while the next cells run
-///     square.write(),
+///     square.anim_ref(Write),
 /// ]
 /// ```
+#[derive(ranim_macros::Animation)]
 pub struct Sound {
     track: AudioTrack,
 }

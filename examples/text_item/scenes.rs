@@ -3,8 +3,8 @@ use std::f64::consts::TAU;
 use ranim::utils::rate_functions::smooth;
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
 use ranim_anims::{
-    creation::{CreationAnim, WritingAnim},
-    rotating::RotatingAnim,
+    creation::{Create, UnCreate, Unwrite, Write},
+    rotating::Rotate,
 };
 use ranim_items::vitem::{VItem, text::TextItem};
 
@@ -22,14 +22,14 @@ fn text_item(r: &mut RanimScene) {
     let mut text_sequence = seq![
         Vec::<VItem>::from(text.clone())
             .iter_mut()
-            .map(|item| item.write().with_rate_func(smooth))
+            .map(|item| item.anim_mut(Write).with_rate_func(smooth))
             .into_lagged(0.1)
     ];
     text_sequence
         .hold(3.0)
         .push(
             Vec::<VItem>::from(text.clone())
-                .rotating(TAU * 4.0, DVec3::Z)
+                .anim_mut(Rotate::new(TAU * 4.0, DVec3::Z))
                 .with_duration(4.0)
                 .with_rate_func(smooth),
         )
@@ -37,7 +37,7 @@ fn text_item(r: &mut RanimScene) {
         .push(
             Vec::<VItem>::from(text.clone())
                 .iter_mut()
-                .map(|item| item.unwrite().with_rate_func(smooth))
+                .map(|item| item.anim_mut(Unwrite).with_rate_func(smooth))
                 .into_lagged(0.1),
         )
         .hold(1.0);
@@ -47,10 +47,14 @@ fn text_item(r: &mut RanimScene) {
         .forward(1.0)
         .push(
             VItem::from(text_box.clone())
-                .create()
+                .anim_mut(Create)
                 .with_rate_func(smooth),
         )
-        .push(VItem::from(text_box).uncreate().with_rate_func(smooth));
+        .push(
+            VItem::from(text_box)
+                .anim_mut(UnCreate)
+                .with_rate_func(smooth),
+        );
 
     let total_secs = text_sequence.cursor_sec().max(box_sequence.cursor_sec());
     r.play(CameraFrame::default().show().with_duration(total_secs));

@@ -121,6 +121,61 @@ pub fn app() -> ranim::wasm::WasmApp {
 and render configuration; `app.build()` finalizes the project for either host.
 See [project entry](./book/project-entry.md) for setup and platform bindings.
 
+#### Parameter-based animations
+
+```rust,ignore
+use ranim::{anims::{fading::{FadeIn, FadeOut}, rotating::Rotate}, prelude::*};
+
+let fade = item.anim_ref(FadeIn); // clone input, leave it unchanged
+let turn = item.anim_mut(Rotate::new(angle, axis)); // also write back the final state
+let exit = item.anim(FadeOut).with_duration(2.0); // consume input
+```
+
+`Anim<T, P>` retains `input` and `params`; prepared runtime states are built at
+lowering, not stored in operation parameters. The old per-animation Item extension
+traits are replaced by `ItemAnimExt`. Custom `Eval` implementations explicitly use
+`.into_animation()` or `AnimNode::from_eval(eval, duration)` instead of receiving
+a playback window through a blanket implementation.
+
+#### Scene browser and animation inspector
+
+The `app` command opens a read-only egui browser: select a scene on the left,
+expand its animation tree, and select a node to inspect timing, rate curves,
+runtime type names, and registered crate metadata. Scenes build lazily on a
+worker thread; a failed constructor is reported without closing the browser.
+
+```sh
+# Any project's run_cli entry (enabled by cmd-app, also included in cmd-preview):
+cargo run --example hello_ranim -- app
+
+# All bundled examples, with example-qualified scene names (run at repo root):
+cargo run -p ranim-examples --features cmd-app --bin examples-inspector
+```
+
+Register animation metadata explicitly in your App or Plugin:
+
+```rust,ignore
+use ranim::prelude::*;
+
+#[derive(Animation)]
+struct MyAnimation {
+    distance: f64,
+}
+
+// Implement Eval separately; deriving Animation only supplies type metadata.
+let mut app = App::new();
+app.add_plugins(BuiltinAnimationsPlugin);
+app.register_animation::<MyAnimation>();
+```
+
+The derive captures the **defining** Cargo package name/version and module/type
+path. The registry describes generic type families; it does not assign persistent
+identities to generic arguments or provide serialization codecs. Re-registering
+identical metadata is harmless; conflicting identities are rejected. Unregistered
+animations, including closures and captured holds, remain inspectable and runnable.
+This first inspector exposes runtime structure, not arbitrary evaluator fields;
+it does not edit animations or save KDL.
+
 #### Experimental scene hot reload
 
 Enable `subsecond` with `cmd-preview` and use Dioxus CLI:

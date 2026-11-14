@@ -5545,6 +5545,7 @@ version = "0.2.1"
 dependencies = [
  "ranim-core",
  "ranim-items",
+ "ranim-macros",
  "tracing",
 ]
 
@@ -5573,6 +5574,7 @@ dependencies = [
 name = "ranim-examples"
 version = "0.2.1"
 dependencies = [
+ "anyhow",
  "bevy_app",
  "getrandom 0.4.3",
  "itertools 0.15.0",

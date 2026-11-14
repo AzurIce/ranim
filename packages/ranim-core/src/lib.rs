@@ -55,6 +55,7 @@ pub mod prelude {
         sequence::AnimSequence,
         stack::AnimStack,
     };
+    pub use crate::animation::definition::{Anim, AnimRecipe, ItemAnimExt};
     pub use crate::animation::eval::{
         Eval, EvalExt, Static, StaticAnim,
         iterative::{Iterative, IterativeEval, IterativeFn},

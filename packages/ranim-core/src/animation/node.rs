@@ -13,7 +13,7 @@ use std::ops::Range;
 
 use crate::{audio::AudioTrack, utils::rate_functions::linear};
 
-use super::eval::{DynOutput, EvalDyn, HeldOutput, OutputContext};
+use super::eval::{DynOutput, Eval, EvalDyn, HeldOutput, OutputContext};
 
 /// Runtime animation content category used by preview tooling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,6 +128,33 @@ impl MixAff {
 }
 
 impl AnimNode {
+    /// Explicitly place a prepared evaluator in a local window of `duration_secs`.
+    ///
+    /// Implementing `Eval` alone does not select a default playback duration.
+    ///
+    /// # Panics
+    ///
+    /// Panics unless the duration is finite and non-negative.
+    pub fn from_eval<E>(eval: E, duration_secs: f64) -> Self
+    where
+        E: Eval + 'static,
+        E::Output: Clone + Send + Sync + 'static,
+    {
+        assert!(
+            duration_secs.is_finite() && duration_secs >= 0.0,
+            "animation duration must be finite and non-negative"
+        );
+        Self {
+            content: NodeContent::Leaf(LeafContent::Anim(Box::new(eval))),
+            internal_time_secs: 1.0,
+            rate_func: None,
+            time_range: 0.0..duration_secs,
+            end_inclusive: true,
+            enabled: true,
+            anim_name: std::any::type_name::<E>(),
+        }
+    }
+
     /// This node's children — only the container kinds have any; leaves
     /// read as the empty slice, so traversals stay uniform without storing
     /// an impossible empty `Vec` per leaf.

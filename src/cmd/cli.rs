@@ -139,6 +139,9 @@ pub fn preview_command(app: RanimApp, scene_name: Option<&str>) -> Result<()> {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Browse registered scenes and inspect their animation trees
+    #[cfg(feature = "cmd-app")]
+    App,
     /// Launch the interactive preview app (defaults to the first scene)
     #[cfg(feature = "cmd-preview")]
     Preview { scene: Option<String> },
@@ -178,6 +181,8 @@ struct ProjectCli {
 impl ProjectCli {
     fn run(self, app: RanimApp) -> Result<()> {
         match self.command {
+            #[cfg(feature = "cmd-app")]
+            Commands::App => super::app::run_app(app),
             #[cfg(feature = "cmd-preview")]
             Commands::Preview { scene } => preview_command(app, scene.as_deref()),
             Commands::Output {
@@ -194,7 +199,7 @@ impl ProjectCli {
 }
 
 /// Parse the process arguments and serve the `preview`, `output`, `render`,
-/// and `inspect` subcommands of this project binary:
+/// `app`, and `inspect` subcommands of this project binary:
 ///
 /// ```ignore
 /// use ranim::prelude::*;
@@ -264,6 +269,14 @@ mod tests {
     #[test]
     fn cli_parses_all_subcommands() {
         let parse = |args: &[&str]| ProjectCli::try_parse_from(args);
+
+        #[cfg(feature = "cmd-app")]
+        assert!(matches!(
+            parse(&["demo", "app"]).unwrap().command,
+            Commands::App
+        ));
+        #[cfg(not(feature = "cmd-app"))]
+        assert!(parse(&["demo", "app"]).is_err());
 
         let cli = parse(&["demo", "output"]).unwrap();
         assert!(matches!(

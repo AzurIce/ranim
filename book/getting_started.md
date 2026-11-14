@@ -50,11 +50,11 @@ fn main() {
 [命令行入口](./cli.md)。`inspect` 是纯 CPU 查询，不执行渲染装配
 （`RenderSetup`）的 GPU 回调。
 
-动画代码通常从 prelude、item 类型和对应的动画扩展 trait 中导入 API：
+动画代码通常从 prelude、Item 类型和动画操作参数中导入 API：
 
 ```rust
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::fading::{FadeIn, FadeOut},
     color::palettes::manim,
     items::vitem::geometry::Square,
     prelude::*,
@@ -89,7 +89,7 @@ use ranim_core::frame::EvaluatedFrame;
 ```rust
 // src/lib.rs
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::fading::{FadeIn, FadeOut},
     color::palettes::manim,
     items::vitem::geometry::Square,
     prelude::*,
@@ -104,9 +104,9 @@ pub fn hello(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .push(square.clone().fade_in())
+        .push(square.anim_ref(FadeIn))
         .hold(1.0)
-        .push(square.fade_out());
+        .push(square.anim(FadeOut));
 
     let mut camera = AnimSequence::new();
     camera
@@ -278,10 +278,10 @@ r.play(content);
 
 ```rust
 sequence
-    .push(square.fade_in())
+    .push(square.anim_ref(FadeIn))
     .hold(1.0)    // 保持淡入后的状态
     .forward(0.5) // 接下来 0.5 秒没有该 Sequence 的输出
-    .push(circle.fade_in());
+    .push(circle.anim_ref(FadeIn));
 ```
 
 ### `show` 与 `hide`
@@ -323,9 +323,11 @@ r.play(layers);
 
 `AnimStack` 的 duration 是最长子动画的 duration。较短子动画结束后不会自动保持到 Stack 结束。
 
-## 类型转换与动画扩展 trait
+## 类型转换与动画参数
 
-动画方法由 requirement/extension trait 提供，使用前需要导入对应 trait。例如 `fade_in` 来自 `FadingAnim`，`morph_to` 来自 `MorphAnim`，`write`/`unwrite` 来自 `WritingAnim`。
+导入 `FadeIn`、`Morph`、`Write` 等参数类型后，通过 prelude 中的 `ItemAnimExt`
+统一绑定输入：`item.anim(params)` 接管输入，`anim_ref` 克隆输入，`anim_mut`
+克隆输入并将终态写回。返回的 `Anim<T, P>` 保留输入和参数，构建时才准备执行器。
 
 有些动画只对更底层的 `VItem` 实现。几何 item 可以通过 `VItem::from` 或 `.into()` 转换：
 

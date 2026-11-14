@@ -3,7 +3,7 @@ use ranim::prelude::*;
 pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
-        anims::morph::MorphAnim,
+        anims::morph::Morph,
         core::animation::{compose::stack::AnimStack, eval::StaticAnim},
         glam::{DVec3, dvec3},
         items::vitem::{
@@ -64,7 +64,7 @@ pub mod test_scenes {
             .collect::<Vec<_>>();
         let mut content = AnimStack::new();
         for (mut square, circle) in squares.into_iter().zip(circles) {
-            content.push(square.morph_to(circle).with_rate_func(smooth));
+            content.push(square.anim_mut(Morph::to(circle)).with_rate_func(smooth));
         }
         content.push(CameraFrame::default().show().with_duration(1.0));
         r.play(content);

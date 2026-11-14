@@ -81,6 +81,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 total_angle: TAU,
             }
             .apply_to(&mut surface)
+            .into_animation()
             .with_duration(8.0)
             .with_rate_func(linear),
         );
@@ -105,6 +106,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 total_angle: TAU,
             }
             .apply_to(&mut surface)
+            .into_animation()
             .with_duration(8.0)
             .with_rate_func(linear),
         );

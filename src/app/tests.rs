@@ -56,6 +56,52 @@ fn duplicate_scene_names_are_rejected() {
     App::new().add_scenes([scene("intro", |_| {}), scene("intro", |_| {})]);
 }
 
+#[derive(crate::Animation)]
+struct RegisteredAnimation;
+
+#[test]
+fn animation_registration_is_app_scoped_and_uses_definition_metadata() {
+    use crate::{Animation, AnimationAppExt, AnimationRegistry};
+    let mut app = App::new();
+    app.register_animation::<RegisteredAnimation>();
+    app.register_animation::<RegisteredAnimation>();
+    let descriptor = RegisteredAnimation::DESCRIPTOR;
+    assert_eq!(descriptor.package, "ranim");
+    let registry = app.world().resource::<AnimationRegistry>();
+    assert_eq!(registry.iter().len(), 1);
+    assert_eq!(registry.get(&descriptor.id()), Some(&descriptor));
+    assert_eq!(
+        registry.resolve(std::any::type_name::<RegisteredAnimation>()),
+        Some(&descriptor)
+    );
+    assert!(
+        App::new()
+            .world()
+            .get_resource::<AnimationRegistry>()
+            .is_none()
+    );
+}
+
+#[test]
+fn builtin_plugin_registers_core_and_enabled_animation_families() {
+    use crate::{Animation, AnimationRegistry, BuiltinAnimationsPlugin};
+    use ranim_core::animation::compose::sequence::AnimSequence;
+    let mut app = App::new();
+    app.add_plugins(BuiltinAnimationsPlugin);
+    let registry = app.world().resource::<AnimationRegistry>();
+    assert!(registry.get(&AnimSequence::DESCRIPTOR.id()).is_some());
+    #[cfg(feature = "anims")]
+    {
+        use ranim_anims::rotating::Rotate;
+        let descriptor = <Rotate as Animation>::DESCRIPTOR;
+        assert_eq!(descriptor.package, "ranim-anims");
+        assert_eq!(
+            registry.resolve(std::any::type_name::<Rotate>()),
+            Some(&descriptor)
+        );
+    }
+}
+
 #[test]
 fn scene_selection_is_lazy_and_clones_descriptors() {
     static BUILDS: AtomicUsize = AtomicUsize::new(0);

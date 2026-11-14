@@ -21,10 +21,14 @@
 pub mod build;
 /// Built-in composition containers and iterator helpers.
 pub mod compose;
+/// Editable operation parameters and input binding.
+pub mod definition;
 /// Evaluation protocols and author-facing adapters.
 pub mod eval;
 /// Runtime animation nodes and their interpreters.
 pub mod node;
+/// Definition-site type identities and app-scoped registration.
+pub mod registry;
 /// Audio leaf animation: a sound placed and composed like any animation.
 pub mod sound;
 
@@ -64,11 +68,11 @@ mod tests {
     }
 
     fn leaf(x: f32, duration: f64) -> impl Unplaced {
-        ShiftX(x).with_duration(duration)
+        ShiftX(x).into_animation().with_duration(duration)
     }
 
     fn progress_leaf(offset: f32) -> impl Unplaced {
-        ShiftAlpha(offset)
+        ShiftAlpha(offset).into_animation()
     }
 
     fn evaluated_xs(items: Vec<DynOutput>) -> Vec<f32> {

@@ -44,7 +44,7 @@ pub enum LaggedFill {
 /// [`with_trailing`](Self::with_trailing) — e.g. `Empty` leading makes items
 /// appear only at their window; to hide an item after its window instead of
 /// holding it, give it an animation that ends hidden, e.g.
-/// `seq![item.fade_in(), item.hide()]`.
+/// `seq![item.anim_ref(FadeIn), item.hide()]`.
 ///
 /// Fills are sampled at build time: empty fills are skipped, and a
 /// zero-duration child gets no leading fill (it appears at its point, which is
@@ -52,6 +52,7 @@ pub enum LaggedFill {
 /// samples, children are expected to be pure (closed-form) animations — a
 /// stateful child's trailing fill would be its initial state, not its true
 /// final state.
+#[derive(ranim_macros::Animation)]
 pub struct AnimLagged {
     animations: Vec<AnimNode>,
     lag_ratio: f64,

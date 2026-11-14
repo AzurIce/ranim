@@ -2,20 +2,14 @@
 //!
 //! [`IntoAnimNode`] is the lowering protocol: it turns an authoring definition
 //! into an [`AnimNode`]. It is intentionally
-//! separate from [`Eval`], the typed visual-leaf
-//! protocol. An `Eval` whose output is `Clone + Send + Sync + 'static` gets an
-//! [`IntoAnimNode`] implementation by blanket impl; the built-in animation
-//! containers implement it directly.
+//! separate from [`Eval`](super::eval::Eval), the typed visual-leaf
+//! protocol. Operations bind their parameters to inputs using `Anim`;
+//! containers and evaluator adapters explicitly implement this protocol.
 //!
 //! [`Unplaced`] marks definitions that have not been fixed to a parent time
 //! coordinate yet, so containers and [`Unplaced::at`] may schedule them.
 
-use std::any::type_name;
-
-use super::{
-    eval::Eval,
-    node::{AnimNode, LeafContent, NodeContent},
-};
+use super::node::AnimNode;
 
 /// A definition that can be lowered into the runtime animation tree.
 pub trait IntoAnimNode: Sized {
@@ -52,6 +46,11 @@ pub trait PlaybackExt: Unplaced {
         Paramed::new(self).with_rate_func(rate_func)
     }
 
+    /// Override an inner rate with the structural identity mapping.
+    fn with_linear_rate(self) -> Paramed<Self> {
+        Paramed::new(self).with_linear_rate()
+    }
+
     /// Change the animation's duration.
     fn with_duration(self, duration_secs: f64) -> Paramed<Self> {
         Paramed::new(self).with_duration(duration_secs)
@@ -65,51 +64,22 @@ pub trait PlaybackExt: Unplaced {
 
 impl<A: Unplaced> PlaybackExt for A {}
 
-impl<E> Unplaced for E
-where
-    E: Eval + 'static,
-    E::Output: Clone + Send + Sync + 'static,
-{
-}
-
-impl<E> IntoAnimNode for E
-where
-    E: Eval + 'static,
-    E::Output: Clone + Send + Sync + 'static,
-{
-    fn into_anim_node(self) -> AnimNode {
-        AnimNode {
-            content: NodeContent::Leaf(LeafContent::Anim(Box::new(self))),
-            internal_time_secs: 1.0,
-            anim_name: type_name::<E>(),
-            rate_func: None,
-            time_range: 0.0..1.0,
-            end_inclusive: true,
-            enabled: true,
-        }
-    }
-}
-
 /// Playback parameters applied to an animation definition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct AnimationParam {
-    /// Time remapping function; `None` is the identity (linear) rate, kept
-    /// structural so the mixing descent can compose affine maps.
-    pub rate_func: Option<fn(f64) -> f64>,
+    /// `None` preserves the inner rate; a present override selects a function
+    /// or the structural identity mapping used by affine audio mixing.
+    pub rate_func: Option<RateOverride>,
     /// Optional duration override in seconds.
     pub duration_secs: Option<f64>,
     /// Whether this animation contributes a value.
-    pub enabled: bool,
+    pub enabled: Option<bool>,
 }
 
-impl Default for AnimationParam {
-    fn default() -> Self {
-        Self {
-            rate_func: None,
-            duration_secs: None,
-            enabled: true,
-        }
-    }
+#[derive(Debug, Clone)]
+pub(crate) enum RateOverride {
+    Linear,
+    Function(fn(f64) -> f64),
 }
 
 /// An animation definition with overridden playback parameters.
@@ -119,6 +89,16 @@ pub struct Paramed<A> {
 }
 
 impl<A> Paramed<A> {
+    /// Borrow the original definition, including its editable input and parameters.
+    pub fn inner(&self) -> &A {
+        &self.inner
+    }
+
+    /// Edit the original definition before preparing runtime execution data.
+    pub fn inner_mut(&mut self) -> &mut A {
+        &mut self.inner
+    }
+
     /// Wrap an animation without overriding its duration.
     pub(crate) fn new(inner: A) -> Self {
         Self {
@@ -129,7 +109,13 @@ impl<A> Paramed<A> {
 
     /// Change the animation's rate function.
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
-        self.param.rate_func = Some(rate_func);
+        self.param.rate_func = Some(RateOverride::Function(rate_func));
+        self
+    }
+
+    /// Override an inner rate with the structural identity mapping.
+    pub fn with_linear_rate(mut self) -> Self {
+        self.param.rate_func = Some(RateOverride::Linear);
         self
     }
 
@@ -146,7 +132,7 @@ impl<A> Paramed<A> {
 
     /// Enable or disable this animation's output.
     pub fn with_enabled(mut self, enabled: bool) -> Self {
-        self.param.enabled = enabled;
+        self.param.enabled = Some(enabled);
         self
     }
 }
@@ -158,9 +144,15 @@ impl<A: Unplaced + 'static> IntoAnimNode for Paramed<A> {
         if let Some(duration_secs) = self.param.duration_secs {
             cell.time_range = 0.0..duration_secs;
         }
-        cell.rate_func = self.param.rate_func;
-        cell.enabled = self.param.enabled;
-        cell.anim_name = type_name::<A>();
+        if let Some(rate_func) = self.param.rate_func {
+            cell.rate_func = match rate_func {
+                RateOverride::Linear => None,
+                RateOverride::Function(function) => Some(function),
+            };
+        }
+        if let Some(enabled) = self.param.enabled {
+            cell.enabled = enabled;
+        }
         cell
     }
 }
@@ -188,4 +180,47 @@ fn assert_valid_duration(duration_secs: f64) {
         duration_secs.is_finite() && duration_secs >= 0.0,
         "animation duration must be finite and non-negative"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{animation::eval::Static, utils::rate_functions::smooth};
+
+    struct Configured;
+    impl Unplaced for Configured {}
+    impl IntoAnimNode for Configured {
+        fn into_anim_node(self) -> AnimNode {
+            let mut node = AnimNode::from_eval(Static(0_u8), 3.0);
+            node.enabled = false;
+            node.rate_func = Some(smooth);
+            node.anim_name = "configured";
+            node
+        }
+    }
+
+    #[test]
+    fn overrides_preserve_unspecified_defaults_and_inner_identity() {
+        let node = Configured.with_duration(5.0).into_anim_node();
+        assert_eq!(node.duration_secs(), 5.0);
+        assert!(!node.enabled());
+        assert_eq!(node.anim_name(), "configured");
+        assert_eq!(node.rate_func.unwrap()(0.25), smooth(0.25));
+        let node = Configured.with_enabled(true).into_anim_node();
+        assert_eq!(node.duration_secs(), 3.0);
+        assert!(node.enabled());
+        assert!(node.rate_func.is_some());
+    }
+
+    #[test]
+    fn nested_overrides_only_replace_requested_fields_and_can_clear_rates() {
+        let inner = Configured.with_enabled(true).with_rate_func(smooth);
+        let node = PlaybackExt::with_duration(inner, 6.0).into_anim_node();
+        assert!(node.enabled());
+        assert_eq!(node.duration_secs(), 6.0);
+        assert!(node.rate_func.is_some());
+        let node = Configured.with_linear_rate().into_anim_node();
+        assert!(node.rate_func.is_none());
+        assert!(!node.enabled());
+    }
 }

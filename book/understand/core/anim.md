@@ -5,9 +5,9 @@
 
 Ranim 的一个场景就是一棵动画树。这棵树分成「定义期」和「运行期」两个层面：
 
-- **定义期（开放）**：叶子是任何实现了 `Eval` 的类型——`FadeIn`、`Morph`、
-  `Pure`、`Iterative` 或自定义 struct，`Eval::Output` 是该动画产出的 item
-  类型 `T`。容器和作者侧组合子位于 `animation::compose`：`AnimSequence` /
+- **定义期（开放）**：`Anim<T, P>` 保存输入 Item 和操作参数；`P: AnimRecipe<T>`
+  将它们构建成 `Eval<Output = T>` 执行器。`Pure`、`Iterative` 也提供显式的
+  播放适配。容器和作者侧组合子位于 `animation::compose`：`AnimSequence` /
   `AnimStack` / `AnimLagged`。
 - **运行期（封闭核心）**：所有定义都会通过 `IntoAnimNode` lower 成一个
   `AnimNode`。`AnimNode` 的内容是封闭的 `NodeContent`：
@@ -17,9 +17,10 @@ Ranim 的一个场景就是一棵动画树。这棵树分成「定义期」和�
 本章自底向上整理这条链路：
 
 ```text
-trait Eval<Output = T>                  叶子协议：alpha -> T 的纯函数
-  │ 具体叶子 struct：FadeIn / Morph / Pure / Iterative / 自定义 …
-  │ blanket IntoAnimNode（默认 linear、1 秒、enabled）
+Item + 参数 P                          anim / anim_ref / anim_mut
+  ▼
+struct Anim<T, P>                       保留输入与参数
+  │ P: AnimRecipe<T>，lower 时构建 Eval 执行器
   ▼
 struct Paramed<A> / At<A>               PlaybackExt / Unplaced::at
   ▼
@@ -73,8 +74,8 @@ pub trait EvalExt: Eval + Sized {
 }
 ```
 
-内置动画的工具方法（`fade_in()` 等）正是靠 `apply_to` 在创建动画的同时把 item
-置为动画末态。
+它们用于直接操作已经准备好的执行器。普通 Item 的动画构造则使用
+`anim` / `anim_ref` / `anim_mut`，见下文。
 
 ### 进度是唯一坐标
 
@@ -92,7 +93,7 @@ pub type DeltaAlpha = f64;  // 均匀进度步长
 ## 内容的两种来源：`Pure` 与 `Iterative`
 
 两者都是 `Eval` 的实现：`Pure` 适配闭式求值，`Iterative` 适配逐步积分。它们与
-具名动画（`FadeIn`、`Morph` 等直接 `impl Eval` 的类型）地位相同，只是内容的
+由具名参数（`FadeIn`、`Morph` 等）生成的执行器共享 `Eval` 协议，只是内容的
 产生方式不同。
 
 ### 纯闭包：`Pure`
@@ -105,8 +106,8 @@ use ranim::core::animation::eval::pure::Pure;
 let animation = Pure::new(|alpha| Square::new(alpha)).with_duration(2.0);
 ```
 
-具名纯动画（`FadeIn`、`Morph`、`Create` 等）直接实现 `Eval`，不需要这个
-wrapper。
+自定义的 `Eval` 不会自动得到播放窗口；可以用 `.into_animation()` 显式选择
+一秒默认窗口，或 `AnimNode::from_eval(evaluator, duration)` 指定窗口。
 
 ### 迭代区段：`IterativeEval` + `Iterative`
 
@@ -156,75 +157,52 @@ let animation = Iterative::from_fn(
 
 ## 从 `Eval` 到可播放的动画
 
-以一行最常见的代码为例，自顶向下拆开它经过的每一层：
+动画操作参数与输入 Item 分开定义：
 
 ```rust
-let animation = square.fade_in().with_duration(1.0);
+let owned = square.clone().anim(FadeIn);
+let borrowed = square.anim_ref(FadeIn);
+let write_back = square.anim_mut(FadeOut).with_duration(2.0);
 ```
 
-**第 1 层：`fade_in()`。** 它来自 `ranim-anims` 的 `FadingAnim` trait（对满足
-`Opacity + Interpolatable + Clone` 的类型自动实现）。它做两件事：构造具名
-evaluator `FadeIn<T>`，并通过 `EvalExt::apply_to` 把 `square` 就地置为动画末
-态——所以动画创建完成时，item 本身已经是「播完」的样子，后续 build 出的新
-状态都从这个末态出发：
+- `anim(params)` 接管输入；`anim_ref(params)` 克隆输入，不修改原值。
+- `anim_mut(params)` 克隆原始输入，再把终态写回原值；`AnimRecipe::end_value`
+  默认在进度 1 处求值，具体操作可覆写以直接构造终态。
+- 返回的 `Anim<T, P>` 保留公开的 `input` 和 `params`，可以修改后重新 `build()`。
+- 淡入的 `src/dst`、Morph 的对齐结果、Orbit 的球坐标等只存在于构建出的执行器中。
+- `IntoAnimNode` 在进入运行时树时构建一次执行器；普通逐帧求值不会重复构建。
+
+例如旋转参数与目标形状分开：
 
 ```rust
-fn fade_in(&mut self) -> FadeIn<Self> {
-    FadeIn::new(self.clone()).apply_to(self)
-}
+let animation = square.anim_mut(Rotate {
+    angle: std::f64::consts::PI,
+    axis: DVec3::Z,
+    point: AabbPoint::CENTER,
+});
 ```
 
-**第 2 层：`FadeIn<T>`。** 它就是一个普通的 `Eval` 实现——持有初末两个状态，
-按 `alpha` 插值：
+Morph 保存明确的目标值。闭包辅助构造只执行一次，不将闭包保存在参数中：
 
 ```rust
-pub struct FadeIn<T: FadingRequirement> {
-    src: T,
-    dst: T,
-}
-
-impl<T: FadingRequirement> Eval for FadeIn<T> {
-    type Output = T;
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        self.src.lerp(&self.dst, alpha)
-    }
-}
+let params = Morph::by(&square, |target| { target.shift(DVec3::X); });
+let animation = square.anim_mut(params);
 ```
 
-**第 3 层：blanket impl。** 任何 `Eval` 实现，只要 `Output` 满足
-`Clone + Send + Sync + 'static`，就自动实现 `IntoAnimNode`，默认参数为 linear、时长
-1 秒、enabled：
-
-```rust
-impl<E> IntoAnimNode for E
-where
-    E: Eval + 'static,
-    E::Output: Clone + Send + Sync + 'static,
-{
-    fn into_anim_node(self) -> AnimNode {
-        AnimNode {
-            content: NodeContent::Leaf(LeafContent::Anim(Box::new(self))),
-            internal_time_secs: 1.0,
-            // rate_func = none（linear）, time_range = 0.0..1.0, enabled = true
-            ...
-        }
-    }
-}
-```
-
-**第 4 层：`with_duration(1.0)`。** 来自 `PlaybackExt`，把动画包成
-`Paramed<A>` 携带播放参数（见下节）。
+`AnimRecipe::default_duration_secs()` 给出操作的默认时长（一秒）；`Sound` 仍采用
+裁剪后音频长度，组合容器仍采用子节点跨度。`.with_duration()` 等方法通过
+`Paramed<A>` 只覆盖指定字段，不会重置其他默认值。
 
 `ranim-anims` 只包含这类具名叶子动画家族，通用适配器（`Pure` / `Iterative`
 / `Static`）与 lowering 协议在 `ranim_core::animation` 中：
 
 ```text
 ranim::anims
-├── camera     （Orbit、CameraFrameAnim）
+├── camera     （Orbit）
 ├── creation   （Create/UnCreate/Write/Unwrite）
 ├── fading     （FadeIn/FadeOut）
 ├── morph      （Morph）
-└── rotating   （RotatingAnimation）
+└── rotating   （Rotate）
 ```
 
 ### `Unplaced`、`PlaybackExt`、`Paramed` 与 `At`
@@ -259,9 +237,9 @@ cursor，并按 node duration 推进 cursor：
 ```rust
 let mut intro = AnimSequence::new();
 intro
-    .push(square.clone().fade_in())
+    .push(square.anim_ref(FadeIn))
     .hold(1.0)
-    .push(square.fade_out());
+    .push(square.anim_mut(FadeOut));
 
 r.play(intro);
 ```
@@ -410,9 +388,9 @@ r.play(content);
 
 ```rust
 let animation = lagged![0.2;
-    square.fade_in(),
-    circle.fade_in(),
-    text.write(),
+    square.anim_ref(FadeIn),
+    circle.anim_ref(FadeIn),
+    text.anim_ref(Write),
 ];
 r.play(animation);
 ```
@@ -423,7 +401,7 @@ r.play(animation);
 实际渲染的内容，没有隐藏的求值规则。每端的行为可以用
 `with_leading`/`with_trailing` 配置（`LaggedFill::{Hold, Empty}`，默认都是
 `Hold`）；若希望元素在窗口结束后消失，让它的动画以 `hide` 结尾即可（如
-`seq![item.fade_in(), item.hide()]`）。
+`seq![item.anim_ref(FadeIn), item.hide()]`）。
 
 填充在 build 时采样，因此子动画应当是纯（闭式）动画——迭代式子动画的末态
 填充会得到其初态。
@@ -433,7 +411,7 @@ r.play(animation);
 ```rust
 let animation = group
     .iter_mut()
-    .map(|item| item.fade_in().with_rate_func(smooth))
+    .map(|item| item.anim_mut(FadeIn).with_rate_func(smooth))
     .into_lagged(0.2);
 ```
 
@@ -446,8 +424,8 @@ let animation = group
 
 ```rust
 let intro = seq![
-    square.clone().fade_in(),
-    square.fade_out(),
+    square.anim_ref(FadeIn),
+    square.anim(FadeOut),
 ];
 
 let scene = stack![intro, camera];
@@ -532,10 +510,10 @@ hold 不会嵌套捕获。普通叶子无需先产生 `Vec<DynOutput>`。`Vec<T>
 ```rust
 let mut scene = RanimScene::new();
 scene.play(seq![
-    square.fade_in(),
+    square.anim_ref(FadeIn),
     Sound::new(AudioClip::from_file("narration.wav")?)
         .with_fade_in(0.25),
-    square.write(),
+    square.anim_ref(Write),
 ]);
 ```
 

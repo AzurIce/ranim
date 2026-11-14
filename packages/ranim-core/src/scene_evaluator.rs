@@ -125,7 +125,7 @@ mod tests {
         RanimScene, SealedRanimScene,
         animation::{
             build::{PlaybackExt, Unplaced},
-            eval::{Eval, iterative::Iterative},
+            eval::{Eval, EvalExt, iterative::Iterative},
         },
         seq,
     };
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn functional_scene_matches_pure_eval() {
         let mut scene = RanimScene::new();
-        scene.play(ProgressX.with_duration(2.0));
+        scene.play(ProgressX.into_animation().with_duration(2.0));
         let sealed = scene.seal();
 
         let mut ev = SceneEvaluator::new(sealed, 120.0);
@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn repeated_samples_replace_the_whole_output_frame() {
         let mut scene = RanimScene::new();
-        scene.play(ProgressX.with_duration(2.0));
+        scene.play(ProgressX.into_animation().with_duration(2.0));
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
         let mut frame = EvaluatedFrame::new();
         frame.push((99, 0), String::from("previous output"));

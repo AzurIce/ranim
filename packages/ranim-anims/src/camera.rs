@@ -1,81 +1,68 @@
-//! Camera frame animations.
+//! Camera orbit parameters and their prepared execution data.
 
 use ranim_core::{
-    animation::eval::{Eval, EvalExt},
+    animation::{definition::AnimRecipe, eval::Eval},
     glam::DVec3,
 };
 use ranim_items::camera::CameraFrame;
 
-// MARK: Anim Trait
-/// The methods to create animations for [`CameraFrame`].
-pub trait CameraFrameAnim {
-    /// Create an orbit animation that rotates the camera around `target`
-    /// by `total_angle` radians in the XY plane (Z-up).
-    ///
-    /// The camera's current position is used to derive the spherical
-    /// coordinates (distance, elevation) which are kept constant during the orbit.
-    ///
-    /// # Example
-    /// ```ignore
-    /// use std::f64::consts::TAU;
-    ///
-    /// let mut cam = CameraFrame::from_spherical(phi, theta, distance);
-    /// r.play(
-    ///     cam.orbit(DVec3::ZERO, TAU)
-    ///         .with_duration(8.0)
-    ///         .with_rate_func(linear),
-    /// );
-    /// ```
-    fn orbit(&mut self, target: DVec3, total_angle: f64) -> Orbit;
+/// Orbit around a target in the XY plane (Z-up).
+#[derive(Clone, Copy, Debug, ranim_macros::Animation)]
+pub struct Orbit {
+    /// Orbit target.
+    pub target: DVec3,
+    /// Total rotation, in radians.
+    pub angle: f64,
 }
 
-impl CameraFrameAnim for CameraFrame {
-    fn orbit(&mut self, target: DVec3, total_angle: f64) -> Orbit {
-        let offset = self.pos - target;
+impl Orbit {
+    /// Describe an orbit around `target` through `angle` radians.
+    pub fn new(target: DVec3, angle: f64) -> Self {
+        Self { target, angle }
+    }
+}
+
+/// Prepared camera orbit with derived spherical coordinates.
+pub struct OrbitEval {
+    src: CameraFrame,
+    target: DVec3,
+    distance: f64,
+    phi: f64,
+    theta0: f64,
+    angle: f64,
+}
+
+impl AnimRecipe<CameraFrame> for Orbit {
+    type Animation = OrbitEval;
+    fn build(&self, input: &CameraFrame) -> Self::Animation {
+        let offset = input.pos - self.target;
         let distance = offset.length();
         let phi = if distance > 0.0 {
             (offset.z / distance).acos()
         } else {
             0.0
         };
-        let theta0 = offset.y.atan2(offset.x);
-
-        Orbit {
-            src: self.clone(),
-            target,
+        OrbitEval {
+            src: input.clone(),
+            target: self.target,
             distance,
             phi,
-            theta0,
-            total_angle,
+            theta0: offset.y.atan2(offset.x),
+            angle: self.angle,
         }
-        .apply_to(self)
     }
 }
 
-// MARK: Impl
-/// An orbit animation rotating the camera around a target.
-pub struct Orbit {
-    /// The camera state at the start of the orbit.
-    pub src: CameraFrame,
-    /// The orbit target.
-    pub target: DVec3,
-    /// Distance from the target.
-    pub distance: f64,
-    /// Elevation angle kept constant during the orbit.
-    pub phi: f64,
-    /// Initial azimuth angle.
-    pub theta0: f64,
-    /// Total angle to rotate, in radians.
-    pub total_angle: f64,
-}
-
-impl Eval for Orbit {
+impl Eval for OrbitEval {
     type Output = CameraFrame;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        let theta = self.theta0 + self.total_angle * alpha;
+    fn eval_alpha(&self, alpha: f64) -> CameraFrame {
         let mut result = self.src.clone();
-        result.set_spherical(self.phi, theta, self.distance, self.target);
+        result.set_spherical(
+            self.phi,
+            self.theta0 + self.angle * alpha,
+            self.distance,
+            self.target,
+        );
         result
     }
 }

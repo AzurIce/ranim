@@ -1,77 +1,74 @@
+//! Morph parameters and prepared geometry alignment.
+
 use ranim_core::{
-    animation::eval::{Eval, EvalExt},
+    animation::{definition::AnimRecipe, eval::Eval},
     traits::{Alignable, Interpolatable},
 };
 
-// ANCHOR: MorphRequirement
-/// The requirement of [`Morph`]
+/// Item capabilities needed for aligned interpolation.
 pub trait MorphRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> MorphRequirement for T {}
-// ANCHOR_END: MorphRequirement
 
-// ANCHOR: MorphAnim
-/// The methods to create animations for `T` that satisfies [`MorphRequirement`]
-pub trait MorphAnim: MorphRequirement + Sized + 'static {
-    /// Create a [`Morph`] anim with a func.
-    fn morph<F: Fn(&mut Self)>(&mut self, f: F) -> Morph<Self>;
-    /// Create a [`Morph`] anim from src.
-    fn morph_from(&mut self, src: Self) -> Morph<Self>;
-    /// Create a [`Morph`] anim to dst.
-    fn morph_to(&mut self, dst: Self) -> Morph<Self>;
+/// Interpolate an input item to an explicit destination.
+#[derive(Clone, ranim_macros::Animation)]
+pub struct Morph<T> {
+    /// Destination before runtime alignment is performed.
+    pub target: T,
 }
-// ANCHOR_END: MorphAnim
 
-// ANCHOR: MorphAnim-Impl
-impl<T: MorphRequirement + 'static> MorphAnim for T {
-    fn morph<F: Fn(&mut T)>(&mut self, f: F) -> Morph<T> {
-        let mut dst = self.clone();
-        (f)(&mut dst);
-        Morph::new(self.clone(), dst).apply_to(self)
-    }
-    fn morph_from(&mut self, s: T) -> Morph<T> {
-        Morph::new(s, self.clone()).apply_to(self)
-    }
-    fn morph_to(&mut self, d: T) -> Morph<T> {
-        Morph::new(self.clone(), d).apply_to(self)
+impl<T> Morph<T> {
+    /// Describe an explicit destination.
+    pub fn to(target: T) -> Self {
+        Self { target }
     }
 }
-// ANCHOR_END: MorphAnim-Impl
 
-// ANCHOR: Morph
-/// Morph Anim
-pub struct Morph<T: MorphRequirement> {
+impl<T: Clone> Morph<T> {
+    /// Construct a destination by editing a clone of `input` once.
+    ///
+    /// The closure is not retained: the resulting explicit target can be
+    /// inspected or rebuilt without re-executing authoring code.
+    pub fn by(input: &T, edit: impl FnOnce(&mut T)) -> Self {
+        let mut target = input.clone();
+        edit(&mut target);
+        Self { target }
+    }
+}
+
+/// Prepared interpolation states and derived aligned geometry.
+pub struct MorphEval<T> {
     src: T,
     dst: T,
     aligned_src: T,
     aligned_dst: T,
 }
-// ANCHOR_END: Morph
 
-impl<T: MorphRequirement> Morph<T> {
-    /// Constructor
-    pub fn new(src: T, dst: T) -> Self {
-        let mut aligned_src = src.clone();
-        let mut aligned_dst = dst.clone();
+impl<T: MorphRequirement> AnimRecipe<T> for Morph<T> {
+    type Animation = MorphEval<T>;
+    fn build(&self, input: &T) -> Self::Animation {
+        let mut aligned_src = input.clone();
+        let mut aligned_dst = self.target.clone();
         if !aligned_src.is_aligned(&aligned_dst) {
             aligned_src.align_with(&mut aligned_dst);
         }
-        Self {
-            src,
-            dst,
+        MorphEval {
+            src: input.clone(),
+            dst: self.target.clone(),
             aligned_src,
             aligned_dst,
         }
     }
+    fn end_value(&self, _input: &T) -> T {
+        self.target.clone()
+    }
 }
 
-// ANCHOR: Morph-Eval
-impl<T: MorphRequirement> Eval for Morph<T> {
+impl<T: MorphRequirement> Eval for MorphEval<T> {
     type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+    fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
             self.src.clone()
-        } else if 0.0 < alpha && alpha < 1.0 {
+        } else if (0.0..1.0).contains(&alpha) {
             self.aligned_src.lerp(&self.aligned_dst, alpha)
         } else if alpha == 1.0 {
             self.dst.clone()
@@ -80,4 +77,3 @@ impl<T: MorphRequirement> Eval for Morph<T> {
         }
     }
 }
-// ANCHOR_END: Morph-Eval

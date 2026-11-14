@@ -169,7 +169,9 @@ impl AtlasTimerEval {
 
     fn into_animation(self) -> impl IntoAnimNode {
         let duration_secs = self.timer.duration_secs;
-        self.with_duration(duration_secs).with_rate_func(linear)
+        EvalExt::into_animation(self)
+            .with_duration(duration_secs)
+            .with_rate_func(linear)
     }
 }
 
@@ -206,7 +208,9 @@ impl RecompileTimerEval {
 
     fn into_animation(self) -> impl IntoAnimNode {
         let duration_secs = self.timer.duration_secs;
-        self.with_duration(duration_secs).with_rate_func(linear)
+        EvalExt::into_animation(self)
+            .with_duration(duration_secs)
+            .with_rate_func(linear)
     }
 }
 

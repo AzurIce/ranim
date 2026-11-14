@@ -50,13 +50,14 @@ let vitem = VItem::from_vpoints(vec![
 ## 动画相关 trait
 
 `VItem` 实现了 `Interpolatable`（逐点/逐颜色插值）与 `Alignable`（点数不同
-时自动补齐对齐，`morph` 依赖它），因此可以直接：
+时自动补齐对齐，`Morph` 依赖它），因此可以直接：
 
 ```rust
-let anim = square.morph(|sq| {
+let params = Morph::by(&square, |sq| {
     sq.set_fill_color(manim::BLUE_C);
     sq.shift(DVec3::X * 2.0);
 });
+let anim = square.anim_mut(params);
 ```
 
 还实现了 `FillColor` / `StrokeColor` / `StrokeWidth` / `Opacity` /

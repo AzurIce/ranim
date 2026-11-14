@@ -2,7 +2,7 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::morph::Morph,
     color::palettes::manim,
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
@@ -43,16 +43,16 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
         .collect::<Vec<_>>();
 
     let highlight = |rect: &mut VItem| {
-        rect.morph(|data| {
+        rect.anim_mut(Morph::to(rect.clone().with(|data| {
             data.set_color(manim::RED_C).set_fill_opacity(0.5);
-        })
+        })))
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
     let unhighlight = |rect: &mut VItem| {
-        rect.morph(|data| {
+        rect.anim_mut(Morph::to(rect.clone().with(|data| {
             data.set_color(manim::WHITE).set_fill_opacity(0.5);
-        })
+        })))
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
@@ -86,11 +86,11 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                     .zip(color)
                     .for_each(|(((sequence, rect), dir), color)| {
                         sequence.push(
-                            rect.morph(|rect| {
+                            rect.anim_mut(Morph::to(rect.clone().with(|rect| {
                                 rect.shift(dir * (j - i) as f64)
                                     .set_color(color)
                                     .set_fill_opacity(0.5);
-                            })
+                            })))
                             .with_duration(anim_step_duration)
                             .with_rate_func(linear),
                         );

@@ -87,20 +87,24 @@ pub mod utils {
 pub mod wasm;
 
 pub use app::{
-    AppExt, Output, OutputFormat, RanimApp, RanimAppExt, Scene, SceneConfig, SceneConstructor,
-    Scenes,
+    AnimationAppExt, AppExt, BuiltinAnimationsPlugin, Output, OutputFormat, RanimApp, RanimAppExt,
+    Scene, SceneConfig, SceneConstructor, Scenes,
 };
 pub use bevy_app::{App, Plugin};
 pub use bevy_ecs::prelude::Resource;
+pub use core::animation::definition::{Anim, AnimRecipe, ItemAnimExt};
+pub use core::animation::registry::{Animation, AnimationDescriptor, AnimationRegistry};
+pub use ranim_macros::Animation;
 
 pub use core::glam;
 pub use ranim_core::{RanimScene, lagged, seq, stack};
 
 /// The preludes
 pub mod prelude {
-    pub use crate::app::{AppExt, RanimAppExt};
+    pub use crate::app::{AnimationAppExt, AppExt, RanimAppExt};
     #[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
     pub use crate::cmd::cli::run_cli;
+    pub use crate::{Animation, BuiltinAnimationsPlugin};
     pub use crate::{App, Plugin};
     pub use ranim_core::prelude::*;
     pub use ranim_core::{lagged, seq, stack};

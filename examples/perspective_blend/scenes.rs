@@ -1,5 +1,5 @@
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::morph::Morph,
     color,
     color::palettes::manim,
     glam::DVec3,
@@ -77,7 +77,10 @@ fn perspective_blend(r: &mut RanimScene) {
         .iter_mut()
         .zip(transform_fns)
         .for_each(|(face, transform_fn)| {
-            cube_assembly.push(face.morph(transform_fn).with_rate_func(linear));
+            cube_assembly.push(
+                face.anim_mut(Morph::to(face.clone().with(transform_fn)))
+                    .with_rate_func(linear),
+            );
         });
 
     let mut faces = square_faces.to_vec();
@@ -85,14 +88,14 @@ fn perspective_blend(r: &mut RanimScene) {
     let mut faces_sequence = AnimSequence::new();
     faces_sequence.forward(1.0).push(
         faces
-            .morph(|data| {
+            .anim_mut(Morph::to(faces.clone().with(|data| {
                 data.with_origin(AabbPoint::CENTER, |x| {
                     x.rotate_on_y(std::f64::consts::PI / 6.0);
                 });
                 data.with_origin(AabbPoint::CENTER, |x| {
                     x.rotate_on_x(std::f64::consts::PI / 6.0);
                 });
-            })
+            })))
             .with_duration(4.0)
             .with_rate_func(smooth),
     );
@@ -104,9 +107,9 @@ fn perspective_blend(r: &mut RanimScene) {
         .push(cam.show())
         .hold(2.0)
         .push(
-            cam.morph(|data| {
+            cam.anim_mut(Morph::to(cam.clone().with(|data| {
                 data.perspective_blend = 1.0;
-            })
+            })))
             .with_duration(2.0)
             .with_rate_func(smooth),
         )

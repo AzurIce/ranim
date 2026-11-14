@@ -1,85 +1,63 @@
+//! Opacity animation parameters and prepared evaluators.
+
 use ranim_core::{
-    animation::eval::{Eval, EvalExt},
+    animation::{definition::AnimRecipe, eval::Eval},
     traits::{Interpolatable, Opacity},
 };
 
-// MARK: Require Trait
-/// The requirement of [`FadeIn`] and [`FadeOut`]
+/// Item capabilities needed for opacity interpolation.
 pub trait FadingRequirement: Opacity + Interpolatable + Clone {}
 impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 
-// MARK: Anim Trait
-/// The methods to create animations for `T` that satisfies [`FadingRequirement`]
-pub trait FadingAnim: FadingRequirement + Sized + 'static {
-    /// Create a [`FadeIn`] anim.
-    fn fade_in(&mut self) -> FadeIn<Self>;
-    /// Create a [`FadeOut`] anim.
-    fn fade_out(&mut self) -> FadeOut<Self>;
-}
+/// Fade from transparent to the input item's original opacity.
+#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+pub struct FadeIn;
 
-impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
-    fn fade_in(&mut self) -> FadeIn<Self> {
-        FadeIn::new(self.clone()).apply_to(self)
-    }
-    fn fade_out(&mut self) -> FadeOut<Self> {
-        FadeOut::new(self.clone()).apply_to(self)
-    }
-}
+/// Fade from the input item's opacity to transparent.
+#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+pub struct FadeOut;
 
-// MARK: Impl
-
-/// Fade-in animation.
-///
-/// Because some Items may not be completly opaque, so
-/// this is implemented by setting the opacity to 0.0 as
-/// initial state, then interpolate between them.
-pub struct FadeIn<T: FadingRequirement> {
+/// Prepared opacity interpolation; derived states are not construction parameters.
+pub struct FadeEval<T> {
     src: T,
     dst: T,
 }
 
-impl<T: FadingRequirement> FadeIn<T> {
-    /// Constructor
-    pub fn new(target: T) -> Self {
-        let mut src = target.clone();
-        let dst = target.clone();
+impl<T: FadingRequirement> AnimRecipe<T> for FadeIn {
+    type Animation = FadeEval<T>;
+    fn build(&self, input: &T) -> Self::Animation {
+        let mut src = input.clone();
         src.set_opacity(0.0);
-        Self { src, dst }
+        FadeEval {
+            src,
+            dst: input.clone(),
+        }
+    }
+    fn end_value(&self, input: &T) -> T {
+        input.clone()
     }
 }
 
-impl<T: FadingRequirement> Eval for FadeIn<T> {
-    type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        self.src.lerp(&self.dst, alpha)
-    }
-}
-
-/// Fade-out animation.
-///
-/// Because some Items may not be completly opaque, so
-/// this is implemented by setting the opacity to 0.0 as
-/// target state, then interpolate between them.
-pub struct FadeOut<T: FadingRequirement> {
-    src: T,
-    dst: T,
-}
-
-impl<T: FadingRequirement> FadeOut<T> {
-    /// Constructor
-    pub fn new(target: T) -> Self {
-        let src = target.clone();
-        let mut dst = target.clone();
+impl<T: FadingRequirement> AnimRecipe<T> for FadeOut {
+    type Animation = FadeEval<T>;
+    fn build(&self, input: &T) -> Self::Animation {
+        let mut dst = input.clone();
         dst.set_opacity(0.0);
-        Self { src, dst }
+        FadeEval {
+            src: input.clone(),
+            dst,
+        }
+    }
+    fn end_value(&self, input: &T) -> T {
+        let mut result = input.clone();
+        result.set_opacity(0.0);
+        result
     }
 }
 
-impl<T: FadingRequirement> Eval for FadeOut<T> {
+impl<T: FadingRequirement> Eval for FadeEval<T> {
     type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+    fn eval_alpha(&self, alpha: f64) -> T {
         self.src.lerp(&self.dst, alpha)
     }
 }

@@ -4,7 +4,10 @@
 //! browser preview clock.
 
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim},
+    anims::{
+        creation::{Unwrite, Write},
+        fading::{FadeIn, FadeOut},
+    },
     color::palettes::manim,
     items::vitem::{VItem, geometry::Square},
     prelude::*,
@@ -50,11 +53,11 @@ fn audio_demo(r: &mut RanimScene) {
 
     let visual = stack![
         seq![
-            square.fade_in().with_rate_func(smooth),
+            square.anim_mut(FadeIn).with_rate_func(smooth),
             vitem.show().with_duration(1.0),
-            vitem.clone().unwrite().with_rate_func(smooth),
-            vitem.write().with_rate_func(smooth),
-            vitem.fade_out().with_rate_func(smooth),
+            vitem.anim_ref(Unwrite).with_rate_func(smooth),
+            vitem.anim_mut(Write).with_rate_func(smooth),
+            vitem.anim_mut(FadeOut).with_rate_func(smooth),
         ],
         ding,
     ];

@@ -20,7 +20,7 @@ lint: lint-default
     just lint-feature-boundaries
     just lint-features audio-decode
     just lint-features subsecond
-    just lint-features cmd-preview,typst,gltf
+    just lint-features cmd-preview,typst,gltf,ranim-examples/cmd-app
 
 lint-default: fmt-check
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo clippy --workspace --all-targets -- -D warnings

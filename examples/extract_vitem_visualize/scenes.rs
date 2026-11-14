@@ -3,7 +3,11 @@ use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
+    anims::{
+        creation::{Unwrite, Write},
+        fading::FadeOut,
+        morph::Morph,
+    },
     color,
     color::palettes::manim,
     core::components::width::Width,
@@ -39,23 +43,26 @@ fn ranim_text(r: &mut RanimScene) {
         .push(cam.show())
         .hold(1.0)
         .push(
-            cam.morph(|cam| {
+            cam.anim_mut(Morph::to(cam.clone().with(|cam| {
                 cam.scale = 0.3;
                 cam.up = DVec3::NEG_X;
                 cam.pos.shift(DVec3::NEG_X * 6.0);
-            })
+            })))
             .with_rate_func(smooth),
         )
         .hold(1.0)
         .push(
-            cam.morph(|cam| {
+            cam.anim_mut(Morph::to(cam.clone().with(|cam| {
                 cam.pos.shift(DVec3::X * 12.0);
-            })
+            })))
             .with_duration(7.0)
             .with_rate_func(smooth),
         )
         .hold(1.0)
-        .push(cam.morph_to(CameraFrame::default()).with_rate_func(smooth));
+        .push(
+            cam.anim_mut(Morph::to(CameraFrame::default()))
+                .with_rate_func(smooth),
+        );
 
     let content = visual_text.show().with_duration(camera.cursor_sec());
     r.play(camera);
@@ -81,21 +88,24 @@ pub fn hello_ranim(r: &mut RanimScene) {
 
     let mut content = seq![
         square
-            .clone()
-            .morph_to(circle.clone())
+            .anim_ref(Morph::to(circle.clone()))
             .with_rate_func(smooth)
     ];
     content
         .hold(1.0)
         .push(
             circle
-                .clone()
-                .unwrite()
+                .anim_ref(Unwrite)
                 .with_duration(2.0)
                 .with_rate_func(smooth),
         )
-        .push(circle.write().with_duration(2.0).with_rate_func(smooth))
-        .push(circle.fade_out().with_rate_func(smooth));
+        .push(
+            circle
+                .anim_mut(Write)
+                .with_duration(2.0)
+                .with_rate_func(smooth),
+        )
+        .push(circle.anim_mut(FadeOut).with_rate_func(smooth));
 
     r.play(
         CameraFrame::default()

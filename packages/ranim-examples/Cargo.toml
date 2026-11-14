@@ -15,8 +15,15 @@ path = "../../examples/ranim_examples_bundle.rs"
 default = ["render"]
 # Matches the shared scenes' render configuration gates without native UI.
 render = ["ranim/render"]
+cmd-app = ["ranim/cmd-app", "dep:anyhow"]
+
+[[bin]]
+name = "examples-inspector"
+path = "src/inspector.rs"
+required-features = ["cmd-app"]
 
 [dependencies]
+anyhow = { version = "1.0.104", optional = true }
 bevy_app.workspace = true
 ranim = { workspace = true, features = ["anims", "items", "typst", "gltf"] }
 ranim-core.workspace = true

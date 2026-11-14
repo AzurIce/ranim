@@ -32,3 +32,20 @@ where
         (self.0)(alpha)
     }
 }
+
+impl<T, F> crate::animation::build::Unplaced for Pure<F>
+where
+    T: Clone + Send + Sync + 'static,
+    F: Fn(f64) -> T + 'static,
+{
+}
+
+impl<T, F> crate::animation::build::IntoAnimNode for Pure<F>
+where
+    T: Clone + Send + Sync + 'static,
+    F: Fn(f64) -> T + 'static,
+{
+    fn into_anim_node(self) -> crate::animation::node::AnimNode {
+        crate::animation::node::AnimNode::from_eval(self, 1.0)
+    }
+}
