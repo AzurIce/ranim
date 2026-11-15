@@ -127,13 +127,19 @@ See [project entry](./book/project-entry.md) for setup and platform bindings.
 use ranim::{anims::{fading::{FadeIn, FadeOut}, rotating::Rotate}, prelude::*};
 
 let fade = item.anim_ref(FadeIn); // clone input, leave it unchanged
-let turn = item.anim_mut(Rotate::new(angle, axis)); // also write back the final state
+let turn = item.anim_mut(Rotate::new(angle, axis)); // snapshot input, write back final state now
 let exit = item.anim(FadeOut).with_duration(2.0); // consume input
 ```
 
 `AnimDef<T, R>` retains `initial` and `recipe`; `AnimRecipe::build` constructs an
 independent runtime tree without consuming that definition. `ItemAnimExt` provides
-the input-binding methods; `anim_mut` additionally requires `AnimWriteBack<T>`.
+the input-binding methods; `anim_ref` clones rather than keeping a borrow, and
+`anim_mut` snapshots the original input before immediately writing back the
+recipe's terminal state. It additionally requires `AnimWriteBack<T>`; playback
+settings and later builds do not repeat or undo this write-back.
+See [input binding](./book/understand/core/anim.md#输入绑定) for ownership, snapshots,
+write-back order, and sequential authoring examples.
+
 Custom cloneable `Eval` implementations use `.into_animation()` for a retained
 template, or `AnimNode::from_eval(eval, duration)` inside a recipe.
 
@@ -181,8 +187,8 @@ path. The registry describes generic type families; it does not assign persisten
 identities to generic arguments or provide serialization codecs. Re-registering
 identical metadata is harmless; conflicting identities are rejected. Unregistered
 animations, including closures and captured holds, remain inspectable and runnable.
-This first inspector exposes runtime structure, not arbitrary evaluator fields;
-it does not edit animations or save KDL.
+The Inspector exposes retained definitions and registered type metadata, not
+arbitrary input or recipe fields; it does not edit animations or save KDL.
 
 #### Experimental scene hot reload
 

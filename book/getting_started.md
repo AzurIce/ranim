@@ -325,10 +325,17 @@ r.play(layers);
 
 ## 类型转换与动画参数
 
-导入 `FadeIn`、`Morph`、`Write` 等参数类型后，通过 prelude 中的 `ItemAnimExt`
-统一绑定输入：`item.anim(params)` 接管输入，`anim_ref` 克隆输入，`anim_mut`
-克隆输入并将终态写回，且要求配方实现 `AnimWriteBack<T>`。返回的
-`AnimDef<T, R>` 保留 `initial` 和 `recipe`；`build(&self)` 构建独立运行树而不消费定义。
+`FadeIn`、`Morph`、`Write` 等配方描述动画做什么，通过 prelude 中的 `ItemAnimExt`
+绑定初始状态：
+
+- `item.anim(recipe)` 接管输入。
+- `item.anim_ref(recipe)` 克隆输入，不修改原值，也不长期借用它。
+- `item.anim_mut(recipe)` 先克隆原值，再**立即**将配方终态写回；要求
+  `AnimWriteBack<T>`，便于从这个终态继续构造下一段动画。
+
+返回的 `AnimDef<T, R>` 保留 `initial` 和 `recipe`；播放或 `build(&self)` 不会再次
+写回原变量。所有权、快照、写回顺序和连续构造示例见
+[动画系统的「输入绑定」一节](./understand/core/anim.md#输入绑定)。
 
 有些动画只对更底层的 `VItem` 实现。几何 item 可以通过 `VItem::from` 或 `.into()` 转换：
 

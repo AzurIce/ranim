@@ -35,7 +35,7 @@ struct AnimNode { timing shell, NodeContent }
 RanimScene::seal → SealedRanimScene（定义 + 运行树）→ SceneEvaluator 采样
 ```
 
-## 定义与执行的边界
+## 动画定义：初始状态与配方
 
 **一份动画定义 = 初始状态快照 + 动画配方。**
 
@@ -58,11 +58,164 @@ pub trait AnimRecipe<T> {
 组合子树，没有 `Eval` 关联类型，也不要求运行输出仍是 `T`。例如 `FadeIn` 保留的是
 输入物件和淡入配方；插值用的 `src/dst` 属于 build 出的 `FadeEval`，不是定义字段。
 
+以淡入配方的内部实现为例，build 时才从输入准备透明起点和原始终点，再构建运行节点：
+
+```rust
+impl<T: FadingRequirement + Send + Sync + 'static> AnimRecipe<T> for FadeIn {
+    fn build(&self, input: &T) -> AnimNode {
+        let mut src = input.clone();
+        src.set_opacity(0.0);
+        let eval = FadeEval { src, dst: input.clone() };
+        AnimNode::from_eval(eval, 1.0)
+    }
+}
+```
+
+这里的一秒是配方为运行节点选择的默认窗口，不是 `Eval` 的固有能力。
+音频配方可以选择音轨长度，组合配方也可以返回带有子节点的 `AnimNode`。
+
 `build(&self)` 借用定义并构建独立执行实例，不消耗输入、不替换配方，也不把运行缓存
 写回定义树。保留同一份定义可以重复 build；编辑输入或配方后，新构建的运行树采用
 新值，先前构建的运行树不变。迭代动画的积分缓存也在运行实例中重新建立。
 
-### 定义树与完整定义的类型擦除
+## 输入绑定
+
+`AnimDef::new(initial, recipe)` 要求调用者自己准备初始快照。prelude 导出的
+`ItemAnimExt` 则把三种常用的输入处理方式做成方法；它们都返回同一种
+`AnimDef<T, R>`，区别是如何取得 `initial`，以及是否把终态写回原值。
+
+| 方法 | `initial` 来自哪里 | 对原值的影响 | 要求 |
+| --- | --- | --- | --- |
+| `item.anim(recipe)` | 接管 `item` | 原值被按值传入 | `R: AnimRecipe<T>` |
+| `item.anim_ref(recipe)` | `item.clone()` | 原值不变 | `T: Clone`，`R: AnimRecipe<T>` |
+| `item.anim_mut(recipe)` | 写回前的 `item.clone()` | 立即写入配方终态 | `T: Clone`，`R: AnimWriteBack<T>` |
+
+三者都按值保存配方，不要求配方实现 `Clone`。下面的示例使用：
+
+```rust
+use ranim::{
+    anims::{fading::FadeOut, morph::Morph},
+    glam::DVec3,
+    items::vitem::{VItem, geometry::Square},
+    prelude::*,
+};
+```
+
+### `anim`：接管输入
+
+```rust
+let item = Square::new(2.0);
+let definition = item.anim(FadeOut);
+// 相当于 AnimDef::new(item, FadeOut)。
+```
+
+输入直接成为 `definition.initial`，不会为了绑定再克隆一次。对非 `Copy` 类型，
+`item` 已被移动，之后从 `definition.initial` 访问；`Copy` 类型遵循 Rust 普通的
+传值复制规则。适合不再需要保留原变量、只想把它交给动画定义的情况。
+
+### `anim_ref`：保留原值，取得快照
+
+```rust
+let mut item = VItem::from(Square::new(2.0));
+let definition = item.anim_ref(FadeOut);
+item.shift(DVec3::X);
+// item 现在位于右侧；definition.initial 仍是原位置的物件。
+```
+
+这里的 `ref` 表示从 `&self` 取得快照，不表示定义长期借用原物件。方法返回后仍可
+使用、修改或释放原变量；对于普通值，后续修改原变量不会更新已保存的初始状态。
+快照遵循 `T::clone()` 的语义，框架不会额外提供通用深拷贝。
+
+`anim` 和 `anim_ref` 只绑定输入与配方，不调用 `build`，也不计算或写回终态。
+它们只要求配方接受输入 `T`，不限制配方构建的运行内容必须输出 `T`。
+
+### `anim_mut`：保存原始快照，立即写回终态
+
+可写回的配方另外实现：
+
+```rust
+pub trait AnimWriteBack<T>: AnimRecipe<T> {
+    fn end_value(&self, input: &T) -> T;
+}
+```
+
+`anim_mut` 的操作顺序是先保留原值，再回写，而不是拿回写后的值当初始状态：
+
+```rust
+// item.anim_mut(recipe) 的等价操作：
+let definition = AnimDef::new(item.clone(), recipe);
+item = definition.recipe.end_value(&definition.initial);
+```
+
+例如构造一个向右移动的定义：
+
+```rust
+let mut item = VItem::from(Square::new(2.0));
+let movement = Morph::by(&item, |target| { target.shift(DVec3::X); });
+let definition = item.anim_mut(movement);
+// definition.initial：移动前的状态。
+// definition.recipe.target 和 item：移动后的状态。
+```
+
+**写回发生在调用 `anim_mut` 时，不是播放时，也不是每帧求值时。** 返回值仍然是一份
+持有原始快照的定义，不会保留对 `item` 的可变借用。`end_value` 可以直接计算终态，
+也可以在配方内部通过具体执行器求值；不需要从擦除后的运行树里猜测哪个输出能写回。
+
+只有 `R: AnimWriteBack<T>` 的配方才能调用 `anim_mut`，这个要求由编译器检查。
+仅实现 `AnimRecipe<T>` 的配方仍能用于 `anim` / `anim_ref`，不会被迫提供写回逻辑。
+
+`.with_duration()`、`.with_rate_func()` 和 `.with_enabled()` 配置后续播放，不改变这次
+写回的含义：时长不会让写回延后，自定义速率不会重新计算写回值，禁用播放也不会
+撤销已经完成的终态写回。写回值由配方的 `end_value` 决定。
+
+### 连续构造与编辑定义
+
+立即写回让后一次构造自然从前一次的终态继续：
+
+```rust
+let mut item = VItem::from(Square::new(2.0));
+let right = Morph::by(&item, |target| { target.shift(DVec3::X); });
+let go_right = item.anim_mut(right); // item 此时已经在右侧。
+let up = Morph::by(&item, |target| { target.shift(DVec3::Y); });
+let go_up = item.anim_mut(up);       // go_up.initial 是右移后的状态。
+let content = seq![go_right, go_up];
+```
+
+`Morph::by` 的闭包只在创建配方时执行一次，结果保存在明确的 `target` 中，不会在
+重复 build 时重新运行这段作者代码。两份定义各自保存输入，不依赖一个运行时可变物件表。
+
+要改变已保存的定义，直接编辑 `initial` 或 `recipe`，再构建新的运行实例：
+
+```rust
+let target = item.clone();
+let mut definition = item.anim_ref(Morph::to(target));
+let first = definition.build();
+definition.recipe.target.shift(DVec3::X);
+let second = definition.build();
+// first 使用原目标；second 使用编辑后的目标。
+```
+
+重复 build 不会重新执行 `anim_mut` 对原变量的写回。`AnimDef` 保存的是输入和配方，
+不是原变量的可变引用，也不是已经准备好的执行器。
+
+### 内置动画配方
+
+`ranim-anims` 提供具名动画配方。淡入的透明起点、Morph 的对齐结果、Orbit 的球坐标
+等派生数据在 build 时准备，不存入配方参数：
+
+```text
+ranim::anims
+├── camera     （Orbit）
+├── creation   （Create/UnCreate/Write/Unwrite）
+├── fading     （FadeIn/FadeOut）
+├── morph      （Morph）
+└── rotating   （Rotate）
+```
+
+通用适配器（`Pure` / `Iterative` / `Static`）、定义树和运行节点位于
+`ranim_core::animation`，求值协议在运行期部分之后介绍。
+
+## 组成定义树：完整定义的类型擦除
 
 ```rust
 pub enum AnimDefNodeContent {
@@ -98,199 +251,11 @@ pub struct AnimDefNode {
 或 Lagged 需要边缘填充时，可以临时 build 并查询或求值；原定义仍然保留。采样
 结果通过现有静态定义保存，不引入延迟采样或兄弟节点构建上下文。
 
-## `Eval`：叶子求值协议
-
-视觉执行器实现统一的求值协议。构建出的动画内容是自身归一化进度
-`alpha ∈ [0, 1]` 的纯函数；编辑定义后通过重新 build 准备新的执行器。
-
-```rust
-pub trait Eval {
-    type Output;
-
-    /// 在归一化进度 alpha 处求值。
-    fn eval_alpha(&self, alpha: f64) -> Self::Output;
-}
-```
-
-- 协议只有一个入口：`eval_alpha(&self, alpha)`；
-- 它是 `&self` 上的纯查询：无论调用顺序和次数，同一个 `alpha` 得到同一个
-  `Output`；
-- evaluator 看不到秒、场景时钟或 `logic_fps`。`AnimNode` 负责把场景时间
-  映射成进度后才调用它；
-- 有状态（迭代）区段在内部记忆化自己的积分快照；纯区段就是闭式。
-
-运行期的 `LeafContent::Anim` 持有 `Box<dyn EvalDyn>`，它是 `Eval` 的擦除
-对应物：`Eval` 带有关联类型 `Output`，不能直接作为 trait object，因此
-`animation::eval` 为所有满足 `Output: Clone + Send + Sync + 'static` 的 `E: Eval`
-自动实现了 `EvalDyn`。普通采样将完整输出直接写入类型化帧；hold 捕获同样的
-原始值供后续克隆，不改变其具体类型。
-视觉执行器和音频是叶子载荷；组合结构由 `Children` 表示。
-
-除显式播放适配外，`EvalExt` 还提供两个操作已准备执行器的便捷方法：
-
-```rust
-pub trait EvalExt: Eval + Sized {
-    fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self;
-    fn apply_to(self, item: &mut Self::Output) -> Self; // alpha = 1.0
-}
-```
-
-它们用于直接操作已经准备好的执行器。普通 Item 的动画构造则使用
-`anim` / `anim_ref` / `anim_mut`，见下文。
-
-### 进度是唯一坐标
-
-`ranim::core::time` 只有两个类型别名：
-
-```rust
-pub type Alpha = f64;       // 归一化进度
-pub type DeltaAlpha = f64;  // 均匀进度步长
-```
-
-「内容即序列」：迭代动画的内容是作者声明的进度点序列 `x₀…x_N`。`N` 是定义而
-不是采样精度；`rate_func`、`with_duration`、placement 都只是「哪个进度何时可
-见」的采样重映射。
-
-## 内容的两种来源：`Pure` 与 `Iterative`
-
-两者都是 `Eval` 的实现：`Pure` 适配闭式求值，`Iterative` 适配逐步积分。它们与
-由具名参数（`FadeIn`、`Morph` 等）生成的执行器共享 `Eval` 协议，只是内容的
-产生方式不同。
-
-### 纯闭包：`Pure`
-
-闭包是匿名类型，不能按名字实现 `Eval`，所以用 `Pure` 包一层：
-
-```rust
-use ranim::core::animation::eval::pure::Pure;
-
-let animation = Pure::new(|alpha| Square::new(alpha)).with_duration(2.0);
-```
-
-自定义的 `Eval` 不会自动得到播放窗口；可克隆的执行器可以用
-`.into_animation()` 显式选择一秒默认窗口，每次构建时克隆模板。
-`Pure` 的闭包也需要 `Clone`。配方内部可以用
-`AnimNode::from_eval(evaluator, duration)` 直接构建运行节点，无需执行器可克隆。
-
-### 迭代区段：`IterativeEval` + `Iterative`
-
-物理模拟、混沌系统等没有闭式的内容，用逐步推进的方式定义：
-
-```rust
-pub trait IterativeEval {
-    type Output;
-
-    /// 推进一个内容步。alpha 是当前进度，delta_alpha = 1/N。
-    fn step(&self, output: &mut Self::Output, alpha: f64, delta_alpha: f64);
-}
-```
-
-`Iterative::new(initial, evaluator)` 持有不可变的定义（初始状态、`sim_step`、
-step 逻辑），把积分快照放在内部 `RefCell<Snapshot>` 中：
-
-```rust
-let sim_secs = 4.0;
-
-let animation = Iterative::from_fn(
-    SpringState { x: 1.0, v: 0.0 },
-    move |state: &mut SpringState, _alpha, delta_alpha| {
-        let dt = sim_secs * delta_alpha; // 内容自己的物理秒
-        let acc = -K * state.x - C * state.v;
-        state.v += acc * dt;
-        state.x += state.v * dt;
-    },
-)
-.with_steps(240)
-.with_duration(sim_secs);
-```
-
-- 逻辑时长用过程中的局部变量（例如 `sim_secs`）捕获，并同时传给
-  `with_duration`，不要使用全局 `const`；
-- 迭代逻辑较复杂时，实现命名 `IterativeEval` 结构体，把 `sim_secs` 等参数放在
-  `self` 上；
-- `with_steps(N)` 声明内容自己的步数，默认进度步长为 `1/120`；
-- `eval_alpha(target)` 前进时逐 `sim_step` 积分，回退时从初始状态重置重放，
-  重复查询同一个 `alpha` 是 O(1)；
-- 可变状态全部住在 `Output` 里；
-- 闭包的状态类型位于 `Fn` 输入位置，无法从闭包类型反推出关联 `Output`，所以
-  `Iterative::from_fn` 通过 `IterativeFn<S, F>` 显式绑定二者。
-
-`Iterative` 实现的 `Eval::sim_step()` 返回 `Some(1/N)`，供 `inspect tree`
-等工具内省；它不影响求值本身。
-每次由定义构建运行节点时，积分快照从原始输入重新建立，不复用先前运行的缓存。
-
-## 从输入和配方到可播放定义
-
-```rust
-pub trait AnimWriteBack<T>: AnimRecipe<T> {
-    fn end_value(&self, input: &T) -> T;
-}
-```
-
-`AnimWriteBack` 是独立的终态写回能力。因为 `AnimRecipe` 不限制运行输出类型，不能
-普遍从一个 `AnimNode` 中猜测可写回的 `T`；只有显式实现 `end_value` 的配方才能用于
-`anim_mut`。它可以直接计算终态，也可以在内部通过具体的执行器求值。
-
-动画操作参数与输入 Item 分开定义：
-
-```rust
-let owned = square.clone().anim(FadeIn);
-let borrowed = square.anim_ref(FadeIn);
-let write_back = square.anim_mut(FadeOut).with_duration(2.0);
-```
-
-- `anim(params)` 接管输入；`anim_ref(params)` 克隆输入，不修改原值。
-- `anim_mut(params)` 克隆原始输入，再通过 `AnimWriteBack::end_value` 把终态写回；
-  未实现写回能力的配方会在编译期被拒绝。`anim` 和 `anim_ref` 不受此限制。
-- 返回的 `AnimDef<T, R>` 保留公开的 `initial` 和 `recipe`，可以修改后重新 `build()`。
-- 淡入的 `src/dst`、Morph 的对齐结果、Orbit 的球坐标等只存在于构建出的执行器中。
-- `AnimDefNode` 擦除完整定义而非执行器，支持 downcast；`build(&self)` 不消费定义。
-  排布和边缘采样需要时可临时 build，普通逐帧求值只读取已构建的运行节点。
-
-例如旋转参数与目标形状分开：
-
-```rust
-let animation = square.anim_mut(Rotate {
-    angle: std::f64::consts::PI,
-    axis: DVec3::Z,
-    point: AabbPoint::CENTER,
-});
-```
-
-Morph 保存明确的目标值。闭包辅助构造只执行一次，不将闭包保存在参数中：
-
-```rust
-let params = Morph::by(&square, |target| { target.shift(DVec3::X); });
-let animation = square.anim_mut(params);
-```
-
-保留的输入和配方可以直接编辑，构建出的实例与后续编辑相互独立：
-
-```rust
-let mut definition = square.anim_ref(Morph::to(target));
-let first = definition.build();
-definition.recipe.target.shift(DVec3::X);
-let second = definition.build();
-// first 使用原目标；second 使用编辑后的目标。
-```
+## 配置播放与放置：`Paramed` 与 `At`
 
 配方构建出的运行节点给出默认播放窗口：内置物件操作为一秒，`Sound` 采用
-裁剪后音频长度，组合容器采用子节点跨度。`.with_duration()` 等方法通过
-`Paramed<A>` 只覆盖指定字段，不会重置其他默认值。
-
-`ranim-anims` 只包含这类具名叶子动画家族，通用适配器（`Pure` / `Iterative`
-/ `Static`）、定义树和运行节点在 `ranim_core::animation` 中：
-
-```text
-ranim::anims
-├── camera     （Orbit）
-├── creation   （Create/UnCreate/Write/Unwrite）
-├── fading     （FadeIn/FadeOut）
-├── morph      （Morph）
-└── rotating   （Rotate）
-```
-
-### `Unplaced`、`PlaybackExt`、`Paramed` 与 `At`
+裁剪后音频长度，组合容器采用子节点跨度。播放包装器只覆盖指定字段，不会重置
+配方的其他默认值。
 
 所有尚未固定父时间坐标的 `Unplaced` 动画通过 `PlaybackExt` 获得统一的播放
 参数 API：
@@ -588,6 +553,127 @@ hold 不会嵌套捕获。普通叶子无需先产生 `Vec<DynOutput>`。`Vec<T>
 
 `logic_fps` 参数仅为 API 兼容保留，不再驱动步进；步进尺度由每个迭代区段自己
 的 `sim_step` 决定。
+
+## `Eval`：叶子求值协议
+
+视觉执行器实现统一的求值协议。构建出的动画内容是自身归一化进度
+`alpha ∈ [0, 1]` 的纯函数；编辑定义后通过重新 build 准备新的执行器。
+
+```rust
+pub trait Eval {
+    type Output;
+
+    /// 在归一化进度 alpha 处求值。
+    fn eval_alpha(&self, alpha: f64) -> Self::Output;
+}
+```
+
+- 协议只有一个入口：`eval_alpha(&self, alpha)`；
+- 它是 `&self` 上的纯查询：无论调用顺序和次数，同一个 `alpha` 得到同一个
+  `Output`；
+- evaluator 看不到秒、场景时钟或 `logic_fps`。`AnimNode` 负责把场景时间
+  映射成进度后才调用它；
+- 有状态（迭代）区段在内部记忆化自己的积分快照；纯区段就是闭式。
+
+运行期的 `LeafContent::Anim` 持有 `Box<dyn EvalDyn>`，它是 `Eval` 的擦除
+对应物：`Eval` 带有关联类型 `Output`，不能直接作为 trait object，因此
+`animation::eval` 为所有满足 `Output: Clone + Send + Sync + 'static` 的 `E: Eval`
+自动实现了 `EvalDyn`。普通采样将完整输出直接写入类型化帧；hold 捕获同样的
+原始值供后续克隆，不改变其具体类型。
+视觉执行器和音频是叶子载荷；组合结构由 `Children` 表示。
+
+除显式播放适配外，`EvalExt` 还提供两个操作已准备执行器的便捷方法：
+
+```rust
+pub trait EvalExt: Eval + Sized {
+    fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self;
+    fn apply_to(self, item: &mut Self::Output) -> Self; // alpha = 1.0
+}
+```
+
+它们用于直接操作已经准备好的执行器。普通 Item 的动画构造则使用前面介绍的
+`anim` / `anim_ref` / `anim_mut`。
+
+### 进度是唯一坐标
+
+`ranim::core::time` 只有两个类型别名：
+
+```rust
+pub type Alpha = f64;       // 归一化进度
+pub type DeltaAlpha = f64;  // 均匀进度步长
+```
+
+「内容即序列」：迭代动画的内容是作者声明的进度点序列 `x₀…x_N`。`N` 是定义而
+不是采样精度；`rate_func`、`with_duration`、placement 都只是「哪个进度何时可
+见」的采样重映射。
+
+## 内容的两种来源：`Pure` 与 `Iterative`
+
+两者都是 `Eval` 的实现：`Pure` 适配闭式求值，`Iterative` 适配逐步积分。它们与
+由具名参数（`FadeIn`、`Morph` 等）生成的执行器共享 `Eval` 协议，只是内容的
+产生方式不同。
+
+### 纯闭包：`Pure`
+
+闭包是匿名类型，不能按名字实现 `Eval`，所以用 `Pure` 包一层：
+
+```rust
+use ranim::core::animation::eval::pure::Pure;
+
+let animation = Pure::new(|alpha| Square::new(alpha)).with_duration(2.0);
+```
+
+自定义的 `Eval` 不会自动得到播放窗口；可克隆的执行器可以用
+`.into_animation()` 显式选择一秒默认窗口，每次构建时克隆模板。
+`Pure` 的闭包也需要 `Clone`。配方内部可以用
+`AnimNode::from_eval(evaluator, duration)` 直接构建运行节点，无需执行器可克隆。
+
+### 迭代区段：`IterativeEval` + `Iterative`
+
+物理模拟、混沌系统等没有闭式的内容，用逐步推进的方式定义：
+
+```rust
+pub trait IterativeEval {
+    type Output;
+
+    /// 推进一个内容步。alpha 是当前进度，delta_alpha = 1/N。
+    fn step(&self, output: &mut Self::Output, alpha: f64, delta_alpha: f64);
+}
+```
+
+`Iterative::new(initial, evaluator)` 持有不可变的定义（初始状态、`sim_step`、
+step 逻辑），把积分快照放在内部 `RefCell<Snapshot>` 中：
+
+```rust
+let sim_secs = 4.0;
+
+let animation = Iterative::from_fn(
+    SpringState { x: 1.0, v: 0.0 },
+    move |state: &mut SpringState, _alpha, delta_alpha| {
+        let dt = sim_secs * delta_alpha; // 内容自己的物理秒
+        let acc = -K * state.x - C * state.v;
+        state.v += acc * dt;
+        state.x += state.v * dt;
+    },
+)
+.with_steps(240)
+.with_duration(sim_secs);
+```
+
+- 逻辑时长用过程中的局部变量（例如 `sim_secs`）捕获，并同时传给
+  `with_duration`，不要使用全局 `const`；
+- 迭代逻辑较复杂时，实现命名 `IterativeEval` 结构体，把 `sim_secs` 等参数放在
+  `self` 上；
+- `with_steps(N)` 声明内容自己的步数，默认进度步长为 `1/120`；
+- `eval_alpha(target)` 前进时逐 `sim_step` 积分，回退时从初始状态重置重放，
+  重复查询同一个 `alpha` 是 O(1)；
+- 可变状态全部住在 `Output` 里；
+- 闭包的状态类型位于 `Fn` 输入位置，无法从闭包类型反推出关联 `Output`，所以
+  `Iterative::from_fn` 通过 `IterativeFn<S, F>` 显式绑定二者。
+
+`Iterative` 实现的 `Eval::sim_step()` 返回 `Some(1/N)`，供 `inspect tree`
+等工具内省；它不影响求值本身。
+每次由定义构建运行节点时，积分快照从原始输入重新建立，不复用先前运行的缓存。
 
 ## 检查与持久化的边界
 
