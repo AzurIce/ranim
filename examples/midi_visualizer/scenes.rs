@@ -13,10 +13,7 @@ use std::{f64::consts::TAU, sync::Arc};
 
 use midi::parse_song;
 use ranim::{glam::DVec3, prelude::*, utils::rate_functions::linear};
-use ranim_core::animation::{
-    build::{IntoAnimNode, Unplaced},
-    eval::StaticAnim,
-};
+use ranim_core::animation::{build::Unplaced, eval::StaticAnim};
 use visual::{
     FRAME_HEIGHT, HitEffectsEval, MidiNotesEval, PianoKeyboardEval, PianoLayout, SingleNoteEval,
     make_background,
@@ -101,7 +98,7 @@ fn common_layers(song: &Arc<midi::MidiSong>, layout: PianoLayout) -> AnimStack {
     ]
 }
 
-fn camera(duration: f64) -> impl IntoAnimNode {
+fn camera(duration: f64) -> impl Into<AnimDefNode> {
     CameraFrame {
         pos: DVec3::ZERO,
         frame_height: FRAME_HEIGHT,

@@ -154,11 +154,16 @@ pub trait SceneConstructor: Send + Sync {
     /// The construct logic
     fn construct(&self, r: &mut RanimScene);
 
-    /// Use the constructor to build a [`SealedRanimScene`]
-    fn build_scene(&self) -> SealedRanimScene {
+    /// Construct retained scene definitions without sealing or baking audio.
+    fn build_definition(&self) -> RanimScene {
         let mut scene = RanimScene::new();
         self.construct(&mut scene);
-        scene.seal()
+        scene
+    }
+
+    /// Construct definitions and compile a [`SealedRanimScene`].
+    fn build_scene(&self) -> SealedRanimScene {
+        self.build_definition().seal()
     }
 }
 // ANCHOR_END: SceneConstructor

@@ -3,7 +3,7 @@ use clap::{Subcommand, ValueEnum};
 use ranim::{
     App, AppExt, SceneConstructor,
     core::{
-        animation::node::{AnimationInfo, AnimationInfoKind},
+        animation::def_node::AnimDefNode,
         frame::{EvaluatedFrame, FrameItemMetadata},
         utils::rate_functions,
     },
@@ -216,39 +216,39 @@ fn tree_output(
     scene_name: String,
     total_secs: f64,
     time_marks: Vec<TimeMarkDto>,
-    infos: Vec<AnimationInfo>,
+    definitions: &[AnimDefNode],
 ) -> TreeOutput {
     TreeOutput {
         schema_version: 1,
         scene: scene_name,
         total_secs,
         time_marks,
-        tree: infos
+        tree: definitions
             .iter()
             .enumerate()
-            .map(|(idx, info)| animation_info_to_tree_node(info, vec![idx]))
+            .map(|(idx, definition)| definition_to_tree_node(definition, vec![idx]))
             .collect(),
     }
 }
 
-fn animation_info_to_tree_node(info: &AnimationInfo, path: Vec<usize>) -> TreeNodeDto {
+fn definition_to_tree_node(info: &AnimDefNode, path: Vec<usize>) -> TreeNodeDto {
     TreeNodeDto {
         path: path.clone(),
-        kind: animation_kind_str(info.kind).to_string(),
-        anim_name: info.anim_name.clone(),
-        range: range_to_array(&info.range),
-        content_duration_secs: info.content_duration_secs,
-        rate_func: rate_func_name(info.rate_func).to_string(),
-        enabled: info.enabled,
-        sim_step: info.sim_step,
+        kind: animation_kind_str(info).to_string(),
+        anim_name: info.anim_name().to_owned(),
+        range: range_to_array(&info.time_range()),
+        content_duration_secs: info.content_duration_secs(),
+        rate_func: rate_func_name(info.rate_func()).to_string(),
+        enabled: info.enabled(),
+        sim_step: info.sim_step(),
         children: info
-            .children
+            .definitions()
             .iter()
             .enumerate()
             .map(|(idx, child)| {
                 let mut child_path = path.clone();
                 child_path.push(idx);
-                animation_info_to_tree_node(child, child_path)
+                definition_to_tree_node(child, child_path)
             })
             .collect(),
     }
@@ -258,11 +258,13 @@ fn range_to_array(range: &std::ops::Range<f64>) -> [f64; 2] {
     [range.start, range.end]
 }
 
-fn animation_kind_str(kind: AnimationInfoKind) -> &'static str {
-    match kind {
-        AnimationInfoKind::Anim => "anim",
-        AnimationInfoKind::Children => "children",
-        AnimationInfoKind::Audio => "audio",
+fn animation_kind_str(node: &AnimDefNode) -> &'static str {
+    if node.is_container() {
+        "children"
+    } else if node.is_audio() {
+        "audio"
+    } else {
+        "anim"
     }
 }
 
@@ -304,8 +306,8 @@ fn short_anim_name(anim_name: &str) -> &str {
 
 fn tree_command(app: &App, scene_name: Option<&str>, format: FormatArg) -> Result<()> {
     let scene = select_scene(app, scene_name)?;
-    let sealed = scene.build_scene();
-    let time_marks = sealed
+    let definition = scene.build_definition();
+    let time_marks = definition
         .time_marks()
         .iter()
         .map(|(sec, mark)| TimeMarkDto {
@@ -320,9 +322,9 @@ fn tree_command(app: &App, scene_name: Option<&str>, format: FormatArg) -> Resul
         .collect();
     let output = tree_output(
         scene.name.clone(),
-        sealed.total_secs(),
+        definition.root.duration_secs(),
         time_marks,
-        sealed.get_animation_infos(),
+        definition.root.definitions(),
     );
     match format {
         FormatArg::Json => print_json(&output),
@@ -482,11 +484,10 @@ fn frame_command(
     let sealed = scene.build_scene();
     let total_secs = sealed.total_secs();
     let mut evaluator = sealed.into_evaluator(120.0);
-    let infos = evaluator.animation_infos();
     let mut frame = EvaluatedFrame::new();
     evaluator.sample_at(at, &mut frame);
 
-    let items = inspect_frame(&frame, &infos, verbose);
+    let items = inspect_frame(&frame, evaluator.definition().definitions(), verbose);
 
     let output = FrameOutput {
         schema_version: 2,
@@ -513,7 +514,7 @@ fn frame_command(
 
 fn inspect_frame(
     frame: &EvaluatedFrame,
-    infos: &[AnimationInfo],
+    infos: &[AnimDefNode],
     _verbose: bool,
 ) -> Vec<FrameItemDto> {
     let mut data = std::collections::HashMap::<usize, FrameItemDataDto>::new();
@@ -617,7 +618,7 @@ impl FrameItemDto {
     fn from_metadata(
         metadata: FrameItemMetadata<'_>,
         data: FrameItemDataDto,
-        infos: &[AnimationInfo],
+        infos: &[AnimDefNode],
     ) -> Self {
         let (animation_id, part) = metadata.id;
         let kind = match &data {
@@ -638,7 +639,7 @@ impl FrameItemDto {
             animation_id,
             part,
             kind: kind.to_string(),
-            source: source_from_infos(infos, animation_id),
+            source: source_from_definitions(infos, animation_id),
             data,
         }
     }
@@ -742,14 +743,14 @@ impl FrameItemDataDto {
     }
 }
 
-fn source_from_infos(infos: &[AnimationInfo], animation_id: usize) -> SourceDto {
+fn source_from_definitions(infos: &[AnimDefNode], animation_id: usize) -> SourceDto {
     infos
         .get(animation_id)
         .map(|info| SourceDto {
             path: vec![animation_id],
-            kind: animation_kind_str(info.kind).to_string(),
-            anim_name: info.anim_name.clone(),
-            range: range_to_array(&info.range),
+            kind: animation_kind_str(info).to_string(),
+            anim_name: info.anim_name().to_owned(),
+            range: range_to_array(&info.time_range()),
         })
         .unwrap_or(SourceDto {
             path: vec![animation_id],
@@ -893,37 +894,30 @@ fn print_json<T: Serialize>(output: &T) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use ranim::core::{animation::node::AnimationInfo, utils::rate_functions};
+    use ranim::core::{
+        animation::{def_node::AnimDefRate, eval::Static},
+        utils::rate_functions,
+    };
 
     use super::*;
     #[cfg(feature = "items")]
     use ranim::glam::{DVec3, Vec4};
 
-    fn sample_animation_info() -> AnimationInfo {
-        AnimationInfo {
-            anim_name: "AnimSequence".to_string(),
-            kind: AnimationInfoKind::Children,
-            range: 0.0..8.0,
-            content_duration_secs: 8.0,
-            rate_func: rate_functions::linear,
-            enabled: true,
-            sim_step: None,
-            children: vec![AnimationInfo {
-                anim_name: "FadeIn<VItem>".to_string(),
-                kind: AnimationInfoKind::Anim,
-                range: 0.0..3.0,
-                content_duration_secs: 3.0,
-                rate_func: rate_functions::smooth,
-                enabled: true,
-                sim_step: None,
-                children: vec![],
-            }],
-        }
+    fn sample_definition() -> AnimDefNode {
+        let mut leaf: AnimDefNode = Static(0_u8).into();
+        leaf.anim_name = Some("FadeIn<VItem>");
+        leaf.time_range = Some(0.0..3.0);
+        leaf.rate_func = Some(AnimDefRate::Function(rate_functions::smooth));
+        let mut root = AnimDefNode::children(vec![leaf]);
+        root.anim_name = Some("AnimSequence");
+        root.time_range = Some(0.0..8.0);
+        root.internal_time_secs = Some(8.0);
+        root
     }
 
     #[test]
-    fn maps_animation_info_to_tree_dto() {
-        let node = animation_info_to_tree_node(&sample_animation_info(), vec![0]);
+    fn maps_retained_definitions_to_tree_dto() {
+        let node = definition_to_tree_node(&sample_definition(), vec![0]);
         assert_eq!(node.path, [0]);
         assert_eq!(node.kind, "children");
         assert_eq!(node.anim_name, "AnimSequence");
@@ -946,7 +940,7 @@ mod tests {
         struct CustomInput;
         let mut frame = EvaluatedFrame::new();
         frame.push((0, 3), CustomInput);
-        let items = inspect_frame(&frame, &[sample_animation_info()], true);
+        let items = inspect_frame(&frame, &[sample_definition()], true);
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].id, [0, 3]);
         assert_eq!(items[0].kind, "opaque");
@@ -975,7 +969,7 @@ mod tests {
 
         let mut frame = EvaluatedFrame::new();
         frame.push((0, 0), vitem);
-        let dto = inspect_frame(&frame, &[sample_animation_info()], false).remove(0);
+        let dto = inspect_frame(&frame, &[sample_definition()], false).remove(0);
 
         assert_eq!(dto.id, [0, 0]);
         assert_eq!(dto.kind, "vitem");
@@ -1007,7 +1001,7 @@ mod tests {
         frame.push((0, 1), vitem::geometry::Square::new(2.0));
         frame.push((0, 2), CameraFrame::default());
 
-        let items = inspect_frame(&frame, &[sample_animation_info()], true);
+        let items = inspect_frame(&frame, &[sample_definition()], true);
         assert_eq!(
             items.iter().map(|item| item.order).collect::<Vec<_>>(),
             [0, 1, 2]
@@ -1052,7 +1046,7 @@ mod tests {
             ),
         );
 
-        let items = inspect_frame(&frame, &[sample_animation_info()], true);
+        let items = inspect_frame(&frame, &[sample_definition()], true);
         assert_eq!(items.len(), 2);
         let item = &items[1];
         assert_eq!(item.order, 1);

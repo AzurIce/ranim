@@ -92,8 +92,9 @@ pub use app::{
 };
 pub use bevy_app::{App, Plugin};
 pub use bevy_ecs::prelude::Resource;
-pub use core::animation::definition::{Anim, AnimRecipe, ItemAnimExt};
+pub use core::animation::def_node::{AnimDef, AnimDefNode, AnimDefNodeContent, ItemAnimExt};
 pub use core::animation::registry::{Animation, AnimationDescriptor, AnimationRegistry};
+pub use core::animation::{AnimRecipe, AnimWriteBack};
 pub use ranim_macros::Animation;
 
 pub use core::glam;

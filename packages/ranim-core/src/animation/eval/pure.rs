@@ -13,6 +13,7 @@ use super::Eval;
 ///
 /// Named pure animations implement `Eval` directly and do not need this
 /// wrapper.
+#[derive(Clone)]
 pub struct Pure<F>(pub F);
 
 impl<F> Pure<F> {
@@ -36,16 +37,25 @@ where
 impl<T, F> crate::animation::build::Unplaced for Pure<F>
 where
     T: Clone + Send + Sync + 'static,
-    F: Fn(f64) -> T + 'static,
+    F: Fn(f64) -> T + Clone + 'static,
 {
 }
 
-impl<T, F> crate::animation::build::IntoAnimNode for Pure<F>
+impl<T, F> From<Pure<F>> for crate::animation::def_node::AnimDefNode
 where
     T: Clone + Send + Sync + 'static,
-    F: Fn(f64) -> T + 'static,
+    F: Fn(f64) -> T + Clone + 'static,
 {
-    fn into_anim_node(self) -> crate::animation::node::AnimNode {
-        crate::animation::node::AnimNode::from_eval(self, 1.0)
+    fn from(definition: Pure<F>) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl<T, F> crate::animation::def_node::DynAnimDef for Pure<F>
+where
+    T: Clone + Send + Sync + 'static,
+    F: Fn(f64) -> T + Clone + 'static,
+{
+    fn build(&self) -> crate::animation::node::AnimNode {
+        crate::animation::node::AnimNode::from_eval(self.clone(), 1.0)
     }
 }

@@ -1,7 +1,7 @@
 //! Rotation parameters, bound to an input through `ItemAnimExt`.
 
 use ranim_core::{
-    animation::{definition::AnimRecipe, eval::Eval},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     glam::DVec3,
     traits::{
         AabbPoint, Locate,
@@ -50,15 +50,29 @@ pub struct RotateEval<T> {
     point: DVec3,
 }
 
-impl<T: RotatingRequirement, A: Locate<T>> AnimRecipe<T> for Rotate<A> {
-    type Animation = RotateEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
+impl<A> Rotate<A> {
+    fn prepare<T: RotatingRequirement>(&self, input: &T) -> RotateEval<T>
+    where
+        A: Locate<T>,
+    {
         RotateEval {
             src: input.clone(),
             angle: self.angle,
             axis: self.axis,
             point: self.point.locate(input),
         }
+    }
+}
+
+impl<T: RotatingRequirement + Send + Sync + 'static, A: Locate<T>> AnimRecipe<T> for Rotate<A> {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(self.prepare(input), 1.0)
+    }
+}
+
+impl<T: RotatingRequirement + Send + Sync + 'static, A: Locate<T>> AnimWriteBack<T> for Rotate<A> {
+    fn end_value(&self, input: &T) -> T {
+        self.prepare(input).eval_alpha(1.0)
     }
 }
 

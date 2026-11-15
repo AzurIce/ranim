@@ -5,10 +5,7 @@ use egui::{
     TextStyle, Ui, pos2, vec2,
 };
 
-use crate::core::{
-    animation::node::{AnimationInfo, AnimationInfoKind},
-    color::palettes::manim,
-};
+use crate::core::{animation::def_node::AnimDefNode, color::palettes::manim};
 
 const HEADER_HEIGHT: f32 = 26.0;
 const TRACK_HEIGHT: f32 = 28.0;
@@ -56,7 +53,6 @@ pub struct TimelineState {
     pub current_sec: f64,
     width_sec: f64,
     offset_sec: f64,
-    animation_infos: Vec<AnimationInfo>,
     expanded: HashSet<AnimationPath>,
     selected: Option<AnimationPath>,
     tree_width: f32,
@@ -65,18 +61,17 @@ pub struct TimelineState {
 }
 
 impl TimelineState {
-    pub fn new(total_sec: f64, animation_infos: Vec<AnimationInfo>) -> Self {
+    pub fn new(total_sec: f64, definitions: &[AnimDefNode]) -> Self {
         let mut expanded = HashSet::new();
-        collect_default_expanded(&animation_infos, &mut Vec::new(), 0, &mut expanded);
+        collect_default_expanded(definitions, &mut Vec::new(), 0, &mut expanded);
 
-        let tree_width = preferred_tree_width(&animation_infos);
+        let tree_width = preferred_tree_width(definitions);
 
         Self {
             total_sec,
             current_sec: 0.0,
             width_sec: total_sec.max(MIN_VISIBLE_SECS),
             offset_sec: 0.0,
-            animation_infos,
             expanded,
             selected: None,
             tree_width,
@@ -85,7 +80,7 @@ impl TimelineState {
         }
     }
 
-    pub fn ui_main_timeline(&mut self, ui: &mut Ui) {
+    pub fn ui_main_timeline(&mut self, ui: &mut Ui, definitions: &[AnimDefNode]) {
         egui::Frame::canvas(ui.style()).show(ui, |ui| {
             let min_height =
                 HEADER_HEIGHT + TRACK_HEIGHT + VIEWPORT_SCROLLBAR_GAP + VIEWPORT_SCROLLBAR_HEIGHT;
@@ -108,7 +103,7 @@ impl TimelineState {
                 .max_height(track_viewport_rect.height())
                 .show(&mut track_ui, |ui| {
                     if self.tracks_dirty {
-                        self.visible_tracks = self.build_visible_tracks();
+                        self.visible_tracks = self.build_visible_tracks(definitions);
                         self.tracks_dirty = false;
                     }
                     let tracks = std::mem::take(&mut self.visible_tracks);
@@ -142,8 +137,8 @@ impl TimelineState {
                         .clamp(MIN_TREE_WIDTH, max_tree_width);
                     }
                     if splitter_response.double_clicked() {
-                        self.tree_width = preferred_tree_width(&self.animation_infos)
-                            .clamp(MIN_TREE_WIDTH, max_tree_width);
+                        self.tree_width =
+                            preferred_tree_width(definitions).clamp(MIN_TREE_WIDTH, max_tree_width);
                     }
 
                     let tree_rect = Rect::from_min_max(
@@ -157,7 +152,7 @@ impl TimelineState {
                         Rect::from_min_max(pos2(tree_rect.right(), canvas.top()), canvas.max);
 
                     self.interact_timeline(ui, &response, time_rect);
-                    self.paint_timeline(ui, canvas, tree_rect, time_rect, &tracks);
+                    self.paint_timeline(ui, canvas, tree_rect, time_rect, &tracks, definitions);
                     if splitter_response.hovered() || splitter_response.dragged() {
                         ui.painter().line_segment(
                             [
@@ -301,17 +296,17 @@ impl TimelineState {
         }
     }
 
-    fn build_visible_tracks(&self) -> Vec<VisibleTrack> {
+    fn build_visible_tracks(&self, definitions: &[AnimDefNode]) -> Vec<VisibleTrack> {
         let mut tracks = Vec::new();
         let mut path = Vec::new();
-        for (index, info) in self.animation_infos.iter().enumerate() {
+        for (index, info) in definitions.iter().enumerate() {
             path.push(index);
             collect_tracks(
-                &self.animation_infos,
+                definitions,
                 info,
                 &mut path,
                 0,
-                info.range.clone(),
+                info.time_range(),
                 &self.expanded,
                 &mut tracks,
             );
@@ -358,6 +353,7 @@ impl TimelineState {
         tree_rect: Rect,
         time_rect: Rect,
         tracks: &[VisibleTrack],
+        definitions: &[AnimDefNode],
     ) {
         let painter = ui.painter_at(canvas);
         let font_id = TextStyle::Body.resolve(ui.style());
@@ -419,23 +415,16 @@ impl TimelineState {
                 painter.rect_filled(track_rect, 0.0, visuals.faint_bg_color);
             }
 
-            self.paint_tree_track(
-                ui,
-                &painter,
-                tree_track_rect,
-                track,
-                &font_id,
-                &small_font_id,
-            );
+            self.paint_tree_track(ui, &painter, tree_track_rect, track, &font_id, definitions);
             self.paint_serial_bands(&painter, time_track_rect, track);
-            self.paint_track_clips(ui, &painter, time_track_rect, track, &font_id);
+            self.paint_track_clips(ui, &painter, time_track_rect, track, &font_id, definitions);
             self.paint_container_rails(
                 &painter,
                 time_rect,
                 tracks,
                 track_index,
                 track,
-                canvas.top(),
+                definitions,
             );
         }
 
@@ -490,9 +479,10 @@ impl TimelineState {
         rect: Rect,
         track: &VisibleTrack,
         font_id: &FontId,
-        small_font_id: &FontId,
+        definitions: &[AnimDefNode],
     ) {
-        let info = animation_info_at_path(&self.animation_infos, &track.path);
+        let small_font_id = TextStyle::Small.resolve(ui.style());
+        let info = definition_at_path(definitions, &track.path);
         let selected = self.selected.as_ref() == Some(&track.path);
         if selected {
             painter.rect_filled(rect, 0.0, ui.visuals().selection.bg_fill);
@@ -507,7 +497,7 @@ impl TimelineState {
         }
 
         let indent_x = rect.left() + 6.0 + track.depth as f32 * INDENT_WIDTH;
-        let expandable = is_expandable_container(info) && !info.children.is_empty();
+        let expandable = is_expandable_container(info) && !info.definitions().is_empty();
         let label_x = if expandable {
             let marker = if self.expanded.contains(&track.path) {
                 egui_phosphor::regular::CARET_DOWN
@@ -539,7 +529,7 @@ impl TimelineState {
             pos2(label_x, rect.top()),
             pos2(rect.right() - 54.0, rect.bottom()),
         );
-        let text_color = if info.enabled {
+        let text_color = if info.enabled() {
             ui.visuals().text_color()
         } else {
             ui.visuals().weak_text_color()
@@ -547,7 +537,7 @@ impl TimelineState {
         painter.with_clip_rect(label_rect).text(
             pos2(label_x, rect.center().y),
             Align2::LEFT_CENTER,
-            short_anim_name(&info.anim_name),
+            short_anim_name(info.anim_name()),
             font_id.clone(),
             text_color,
         );
@@ -558,7 +548,11 @@ impl TimelineState {
                 ui.id().with(("animation_track", &track.path)),
                 Sense::click(),
             )
-            .on_hover_text(format!("{}\n{}", info.anim_name, format_duration(duration)));
+            .on_hover_text(format!(
+                "{}\n{}",
+                info.anim_name(),
+                format_duration(duration)
+            ));
         if response.clicked() {
             self.selected = Some(track.path.clone());
         }
@@ -609,7 +603,7 @@ impl TimelineState {
                     .stroke
                     .color
             } else {
-                animation_color(AnimationInfoKind::Children).gamma_multiply(0.55)
+                container_color().gamma_multiply(0.55)
             };
             painter.rect_filled(rect, CornerRadius::same(3), color.gamma_multiply(0.12));
             painter.line_segment(
@@ -626,6 +620,7 @@ impl TimelineState {
         track_rect: Rect,
         track: &VisibleTrack,
         font_id: &FontId,
+        definitions: &[AnimDefNode],
     ) {
         let mut clip_index = 0;
         while clip_index < track.clips.len() {
@@ -708,7 +703,7 @@ impl TimelineState {
                 continue;
             }
 
-            let info = animation_info_at_path(&self.animation_infos, &clip.path);
+            let info = definition_at_path(definitions, &clip.path);
             let clip_rect = Rect::from_min_max(
                 pos2(visible_start, track_rect.top() + nested_inset),
                 pos2(visible_end, track_rect.bottom() - nested_inset),
@@ -722,7 +717,7 @@ impl TimelineState {
                 )
                 .on_hover_text(format!(
                     "{}\n{} - {}",
-                    info.anim_name,
+                    info.anim_name(),
                     format_time(clip.global_range.start),
                     format_time(clip.global_range.end)
                 ));
@@ -742,7 +737,9 @@ impl TimelineState {
                 self.selected = Some(clip.path.clone());
             }
 
-            if is_expandable_container(info) && !info.children.is_empty() && clip.path != track.path
+            if is_expandable_container(info)
+                && !info.definitions().is_empty()
+                && clip.path != track.path
             {
                 let marker = if self.expanded.contains(&clip.path) {
                     egui_phosphor::regular::CARET_DOWN
@@ -781,7 +778,7 @@ impl TimelineState {
         selected: bool,
         hovered: bool,
     ) {
-        let mut color = animation_color(AnimationInfoKind::Children).gamma_multiply(0.78);
+        let mut color = container_color().gamma_multiply(0.78);
         if hovered {
             color = color.gamma_multiply(1.15);
         }
@@ -810,14 +807,14 @@ impl TimelineState {
         &self,
         painter: &egui::Painter,
         rect: Rect,
-        info: &AnimationInfo,
+        info: &AnimDefNode,
         selected: bool,
         hovered: bool,
         zero_duration: bool,
         font_id: &FontId,
     ) {
-        let mut color = animation_color_for_info(info);
-        if !info.enabled {
+        let mut color = definition_color(info);
+        if !info.enabled() {
             color = color.gamma_multiply(0.38);
         } else if hovered {
             color = color.gamma_multiply(1.15);
@@ -854,7 +851,7 @@ impl TimelineState {
             Stroke::new(1.0, Color32::WHITE.gamma_multiply(0.28)),
         );
 
-        if !info.enabled {
+        if !info.enabled() {
             let mut x = rect.left() - rect.height();
             while x < rect.right() {
                 painter.line_segment(
@@ -865,7 +862,7 @@ impl TimelineState {
             }
         }
 
-        let label_inset = if is_expandable_container(info) && !info.children.is_empty() {
+        let label_inset = if is_expandable_container(info) && !info.definitions().is_empty() {
             17.0
         } else {
             5.0
@@ -878,7 +875,7 @@ impl TimelineState {
             painter.with_clip_rect(label_rect).text(
                 pos2(label_rect.left(), label_rect.center().y),
                 Align2::LEFT_CENTER,
-                short_anim_name(&info.anim_name),
+                short_anim_name(info.anim_name()),
                 font_id.clone(),
                 Color32::BLACK,
             );
@@ -892,10 +889,11 @@ impl TimelineState {
         tracks: &[VisibleTrack],
         track_index: usize,
         track: &VisibleTrack,
-        canvas_top: f32,
+        definitions: &[AnimDefNode],
     ) {
+        let canvas_top = time_rect.top();
         for clip in &track.clips {
-            let info = animation_info_at_path(&self.animation_infos, &clip.path);
+            let info = definition_at_path(definitions, &clip.path);
             if !is_expandable_container(info) || !self.expanded.contains(&clip.path) {
                 continue;
             }
@@ -919,7 +917,7 @@ impl TimelineState {
                 + HEADER_HEIGHT
                 + last_descendant as f32 * (TRACK_HEIGHT + TRACK_GAP)
                 + TRACK_HEIGHT;
-            let color = animation_color(info.kind).gamma_multiply(0.48);
+            let color = definition_color(info).gamma_multiply(0.48);
             for sec in [clip.global_range.start, clip.global_range.end] {
                 let x = self.x_from_sec(time_rect, sec);
                 if time_rect.left() <= x && x <= time_rect.right() {
@@ -994,26 +992,26 @@ impl TimelineState {
 }
 
 fn collect_default_expanded(
-    infos: &[AnimationInfo],
+    infos: &[AnimDefNode],
     path: &mut AnimationPath,
     container_depth: usize,
     expanded: &mut HashSet<AnimationPath>,
 ) {
     for (index, info) in infos.iter().enumerate() {
         path.push(index);
-        if is_expandable_container(info) && !info.children.is_empty() && container_depth < 2 {
+        if is_expandable_container(info) && !info.definitions().is_empty() && container_depth < 2 {
             expanded.insert(path.clone());
         }
         let next_container_depth = container_depth + usize::from(is_expandable_container(info));
-        collect_default_expanded(&info.children, path, next_container_depth, expanded);
+        collect_default_expanded(info.definitions(), path, next_container_depth, expanded);
         path.pop();
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn collect_tracks(
-    roots: &[AnimationInfo],
-    info: &AnimationInfo,
+    roots: &[AnimDefNode],
+    info: &AnimDefNode,
     path: &mut AnimationPath,
     depth: usize,
     global_range: Range<f64>,
@@ -1043,12 +1041,12 @@ fn collect_tracks(
         });
 
         for container in expanded_containers {
-            let container_info = animation_info_at_path(roots, &container.path);
-            for (index, child) in container_info.children.iter().enumerate() {
+            let container_info = definition_at_path(roots, &container.path);
+            for (index, child) in container_info.definitions().iter().enumerate() {
                 let mut child_path = container.path.clone();
                 child_path.push(index);
                 let child_range =
-                    map_child_range(container_info, &container.global_range, &child.range);
+                    map_child_range(container_info, &container.global_range, &child.time_range());
                 collect_tracks(
                     roots,
                     child,
@@ -1072,10 +1070,10 @@ fn collect_tracks(
             }],
             serial_bands: Vec::new(),
         });
-        if info.kind == AnimationInfoKind::Children && expanded.contains(path) {
-            for (index, child) in info.children.iter().enumerate() {
+        if info.is_container() && expanded.contains(path) {
+            for (index, child) in info.definitions().iter().enumerate() {
                 path.push(index);
-                let child_range = map_child_range(info, &global_range, &child.range);
+                let child_range = map_child_range(info, &global_range, &child.time_range());
                 collect_tracks(roots, child, path, depth + 1, child_range, expanded, output);
                 path.pop();
             }
@@ -1085,7 +1083,7 @@ fn collect_tracks(
 
 #[allow(clippy::too_many_arguments)]
 fn collect_serial_content(
-    info: &AnimationInfo,
+    info: &AnimDefNode,
     path: &mut AnimationPath,
     global_range: Range<f64>,
     serial_depth: usize,
@@ -1100,9 +1098,9 @@ fn collect_serial_content(
         depth: serial_depth,
     });
 
-    for (index, child) in info.children.iter().enumerate() {
+    for (index, child) in info.definitions().iter().enumerate() {
         path.push(index);
-        let child_range = map_child_range(info, &global_range, &child.range);
+        let child_range = map_child_range(info, &global_range, &child.time_range());
         if is_serial_container(child) {
             collect_serial_content(
                 child,
@@ -1132,25 +1130,26 @@ fn collect_serial_content(
 }
 
 fn map_child_range(
-    parent: &AnimationInfo,
+    parent: &AnimDefNode,
     parent_global_range: &Range<f64>,
     child_range: &Range<f64>,
 ) -> Range<f64> {
-    if parent.content_duration_secs <= 0.0 {
+    let content_duration = parent.content_duration_secs();
+    if content_duration <= 0.0 {
         return parent_global_range.start..parent_global_range.start;
     }
 
     let duration = parent_global_range.end - parent_global_range.start;
-    let start_alpha = child_range.start / parent.content_duration_secs;
-    let end_alpha = child_range.end / parent.content_duration_secs;
+    let start_alpha = child_range.start / content_duration;
+    let end_alpha = child_range.end / content_duration;
     parent_global_range.start + duration * start_alpha
         ..parent_global_range.start + duration * end_alpha
 }
 
-fn animation_info_at_path<'a>(roots: &'a [AnimationInfo], path: &[usize]) -> &'a AnimationInfo {
+fn definition_at_path<'a>(roots: &'a [AnimDefNode], path: &[usize]) -> &'a AnimDefNode {
     let mut info = &roots[path[0]];
     for &index in &path[1..] {
-        info = &info.children[index];
+        info = &info.definitions()[index];
     }
     info
 }
@@ -1183,22 +1182,22 @@ fn short_anim_name(name: &str) -> &str {
     }
 }
 
-fn preferred_tree_width(infos: &[AnimationInfo]) -> f32 {
-    fn required_width(infos: &[AnimationInfo], container_depth: usize, widest: &mut f32) {
+fn preferred_tree_width(infos: &[AnimDefNode]) -> f32 {
+    fn required_width(infos: &[AnimDefNode], container_depth: usize, widest: &mut f32) {
         for info in infos {
-            if info.kind != AnimationInfoKind::Children || !info.children.is_empty() {
+            if !info.is_container() || !info.definitions().is_empty() {
                 let indent = container_depth as f32 * INDENT_WIDTH;
-                let toggle = if is_expandable_container(info) && !info.children.is_empty() {
+                let toggle = if is_expandable_container(info) && !info.definitions().is_empty() {
                     20.0
                 } else {
                     4.0
                 };
-                let label = short_anim_name(&info.anim_name).chars().count() as f32 * 7.25;
+                let label = short_anim_name(info.anim_name()).chars().count() as f32 * 7.25;
                 let duration_column = 54.0;
                 *widest = widest.max(6.0 + indent + toggle + label + duration_column);
             }
             let child_depth = container_depth + usize::from(is_expandable_container(info));
-            required_width(&info.children, child_depth, widest);
+            required_width(info.definitions(), child_depth, widest);
         }
     }
 
@@ -1207,35 +1206,35 @@ fn preferred_tree_width(infos: &[AnimationInfo]) -> f32 {
     widest.clamp(MIN_TREE_WIDTH, 320.0)
 }
 
-fn animation_color_for_info(info: &AnimationInfo) -> Color32 {
-    if info.kind == AnimationInfoKind::Anim && info.anim_name.contains("::Static<") {
-        let rgba = manim::YELLOW_C.to_rgba8();
-        Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
+fn definition_color(info: &AnimDefNode) -> Color32 {
+    let rgba = if info.is_container() {
+        manim::ORANGE.to_rgba8()
+    } else if info.is_audio() {
+        manim::GREEN_C.to_rgba8()
+    } else if info.anim_name().contains("::Static<") {
+        manim::YELLOW_C.to_rgba8()
     } else {
-        animation_color(info.kind)
-    }
+        manim::BLUE_C.to_rgba8()
+    };
+    Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
 }
 
 /// Ordered, non-overlapping children can share one visual track.
-fn is_serial_container(info: &AnimationInfo) -> bool {
-    info.kind == AnimationInfoKind::Children
+fn is_serial_container(info: &AnimDefNode) -> bool {
+    info.is_container()
         && info
-            .children
+            .definitions()
             .windows(2)
-            .all(|pair| pair[0].range.end <= pair[1].range.start)
+            .all(|pair| pair[0].time_range().end <= pair[1].time_range().start)
 }
 
 /// Overlapping children use expandable tracks instead of a shared row.
-fn is_expandable_container(info: &AnimationInfo) -> bool {
-    info.kind == AnimationInfoKind::Children && !is_serial_container(info)
+fn is_expandable_container(info: &AnimDefNode) -> bool {
+    info.is_container() && !is_serial_container(info)
 }
 
-fn animation_color(kind: AnimationInfoKind) -> Color32 {
-    let rgba = match kind {
-        AnimationInfoKind::Anim => manim::BLUE_C.to_rgba8(),
-        AnimationInfoKind::Children => manim::ORANGE.to_rgba8(),
-        AnimationInfoKind::Audio => manim::GREEN_C.to_rgba8(),
-    };
+fn container_color() -> Color32 {
+    let rgba = manim::ORANGE.to_rgba8();
     Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
 }
 
@@ -1279,28 +1278,21 @@ fn format_time(sec: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ranim_core::utils::rate_functions::linear;
+    use ranim_core::animation::{
+        AnimRecipe, def_node::AnimDefNodeContent, eval::Static, node::AnimNode,
+    };
 
-    fn animation(kind: AnimationInfoKind, range: Range<f64>) -> AnimationInfo {
-        AnimationInfo {
-            anim_name: "test".to_owned(),
-            kind,
-            content_duration_secs: range.end - range.start,
-            range,
-            rate_func: linear,
-            enabled: true,
-            sim_step: None,
-            children: Vec::new(),
-        }
+    fn animation(range: Range<f64>) -> AnimDefNode {
+        let mut definition: AnimDefNode = Static(0_u8).into();
+        definition.time_range = Some(range);
+        definition
     }
 
     #[test]
     fn children_are_laid_out_by_placement_instead_of_authoring_type() {
-        let mut group = animation(AnimationInfoKind::Children, 0.0..3.0);
-        group.children = vec![
-            animation(AnimationInfoKind::Anim, 0.0..1.0),
-            animation(AnimationInfoKind::Anim, 1.0..3.0),
-        ];
+        let mut group = AnimDefNode::children(vec![animation(0.0..1.0), animation(1.0..3.0)]);
+        group.time_range = Some(0.0..3.0);
+        group.internal_time_secs = Some(3.0);
         let mut tracks = Vec::new();
         collect_tracks(
             std::slice::from_ref(&group),
@@ -1316,7 +1308,10 @@ mod tests {
         assert_eq!(tracks[0].clips[0].global_range, 10.0..12.0);
         assert_eq!(tracks[0].clips[1].global_range, 12.0..16.0);
 
-        group.children[0].range.end = 2.0;
+        let AnimDefNodeContent::Children(children) = &mut group.content else {
+            panic!()
+        };
+        children[0].time_range = Some(0.0..2.0);
         tracks.clear();
         collect_tracks(
             std::slice::from_ref(&group),
@@ -1332,5 +1327,23 @@ mod tests {
         assert_eq!(tracks[1].global_range, 10.0..14.0);
         assert_eq!(tracks[2].path, vec![0, 1]);
         assert_eq!(tracks[2].global_range, 12.0..16.0);
+    }
+
+    #[test]
+    fn a_recipe_leaf_stays_one_timeline_clip_even_when_runtime_expands() {
+        struct Expand;
+        impl AnimRecipe<()> for Expand {
+            fn build(&self, _: &()) -> AnimNode {
+                AnimDefNode::children(vec![animation(0.0..1.0), animation(1.0..2.0)]).build()
+            }
+        }
+        let definition = AnimDefNode::from_recipe((), Expand);
+        assert_eq!(definition.build().children().len(), 2);
+        let roots = [definition];
+        let state = TimelineState::new(2.0, &roots);
+        let tracks = state.build_visible_tracks(&roots);
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].clips.len(), 1);
+        assert_eq!(tracks[0].clips[0].path, [0]);
     }
 }

@@ -36,10 +36,10 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use animation::{
-    build::IntoAnimNode,
     compose::stack::AnimStack,
+    def_node::AnimDefNode,
     eval::OutputContext,
-    node::{AnimNode, AnimationInfo, bake_audio},
+    node::{AnimNode, bake_audio},
 };
 use frame::EvaluatedFrame;
 
@@ -48,20 +48,21 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::animation::build::{IntoAnimNode, PlaybackExt, Unplaced};
+    pub use crate::animation::build::{PlaybackExt, Unplaced};
     pub use crate::animation::compose::{
         AnimIterExt,
         lagged::{AnimLagged, LaggedFill},
         sequence::AnimSequence,
         stack::AnimStack,
     };
-    pub use crate::animation::definition::{Anim, AnimRecipe, ItemAnimExt};
+    pub use crate::animation::def_node::{AnimDef, AnimDefNode, AnimDefNodeContent, ItemAnimExt};
     pub use crate::animation::eval::{
         Eval, EvalExt, Static, StaticAnim,
         iterative::{Iterative, IterativeEval, IterativeFn},
         pure::Pure,
     };
     pub use crate::animation::sound::Sound;
+    pub use crate::animation::{AnimRecipe, AnimWriteBack};
     pub use crate::audio::{AudioClip, AudioTrack};
     pub use crate::transformed::{Transformed, TransformedExt};
     pub use crate::{RanimScene, TimeMark};
@@ -97,7 +98,7 @@ impl RanimScene {
     }
 
     /// Push an animation module into the root stack.
-    pub fn play<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
+    pub fn play<A: Into<AnimDefNode>>(&mut self, animation: A) -> &mut Self {
         self.root.push(animation);
         self
     }
@@ -107,15 +108,25 @@ impl RanimScene {
         self.time_marks.push((sec, time_mark));
     }
 
-    /// Finish the definition and produce an immutable, evaluable recipe.
+    /// Scene time marks retained alongside the definition tree.
+    pub fn time_marks(&self) -> &[(f64, TimeMark)] {
+        &self.time_marks
+    }
+
+    /// Retain the definitions and compile an independent runtime tree.
     ///
-    /// The tree is the only animation representation: visual cells are
-    /// point-walked per frame by [`SceneEvaluator::sample_at`], and sound
-    /// leaves are baked here — see [`bake_audio`](crate::animation) — both
-    /// experiencing the same cell remaps along the path.
+    /// Visual cells are point-walked per frame by [`SceneEvaluator::sample_at`],
+    /// and sound leaves are baked here — see [`bake_audio`](crate::animation) —
+    /// using the same runtime timing. Definitions remain available through
+    /// [`SealedRanimScene::definition`].
     pub fn seal(self) -> SealedRanimScene {
         let total_secs = self.root.duration_secs();
-        let animations = self.root.into_built_animations();
+        let animations = self
+            .root
+            .definitions()
+            .iter()
+            .map(AnimDefNode::build)
+            .collect::<Vec<_>>();
         let sample_rate = crate::audio::MASTER_SAMPLE_RATE as f64;
         let audio: Arc<[f32]> = bake_audio(&animations, total_secs, sample_rate).into();
         SealedRanimScene {
@@ -123,6 +134,7 @@ impl RanimScene {
             animations,
             audio,
             time_marks: self.time_marks,
+            definition: self.root,
         }
     }
 }
@@ -130,14 +142,15 @@ impl RanimScene {
 impl Debug for RanimScene {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RanimScene")
-            .field("animations", &self.root.built_animations().len())
+            .field("animations", &self.root.definitions().len())
             .field("duration_secs", &self.root.duration_secs())
             .finish()
     }
 }
 
-/// Immutable animation recipe produced by [`RanimScene::seal`].
+/// Retained definitions and compiled execution state produced by [`RanimScene::seal`].
 pub struct SealedRanimScene {
+    definition: AnimStack,
     total_secs: f64,
     animations: Vec<AnimNode>,
     /// The baked audio plane: interleaved stereo at the master sample rate
@@ -148,6 +161,11 @@ pub struct SealedRanimScene {
 }
 
 impl SealedRanimScene {
+    /// Retained root definitions, independent of the compiled execution tree.
+    pub fn definition(&self) -> &AnimStack {
+        &self.definition
+    }
+
     /// Consume this scene into a [`SceneEvaluator`] driving session.
     ///
     /// `logic_fps` is retained for call-site compatibility; it no longer drives
@@ -171,14 +189,6 @@ impl SealedRanimScene {
     /// Scene time marks.
     pub fn time_marks(&self) -> &[(f64, TimeMark)] {
         &self.time_marks
-    }
-
-    /// Hierarchical runtime animation information for preview tooling.
-    pub fn get_animation_infos(&self) -> Vec<AnimationInfo> {
-        self.animations
-            .iter()
-            .map(AnimNode::animation_info)
-            .collect()
     }
 
     /// Sample all clips active at `target_sec` into typed CPU batches.
@@ -222,10 +232,10 @@ mod tests {
         scene.root.push(leaf(5.0));
         let sealed = scene.seal();
         assert_eq!(sealed.total_secs(), 5.0);
-        let infos = sealed.get_animation_infos();
-        assert_eq!(infos[0].range, 0.0..4.0);
-        assert_eq!(infos[0].children[1].range, 3.0..4.0);
-        assert_eq!(infos[1].range, 0.0..5.0);
+        let definitions = sealed.definition().definitions();
+        assert_eq!(definitions[0].time_range(), 0.0..4.0);
+        assert_eq!(definitions[0].definitions()[1].time_range(), 3.0..4.0);
+        assert_eq!(definitions[1].time_range(), 0.0..5.0);
     }
 
     #[test]

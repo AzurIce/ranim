@@ -67,6 +67,7 @@ pub trait IterativeEval {
 /// The wrapper binds the function's mutable input type as the evaluator's
 /// unique [`Output`](IterativeEval::Output). Prefer [`Iterative::from_fn`] to
 /// constructing this type directly.
+#[derive(Clone)]
 pub struct IterativeFn<S, F> {
     eval: F,
     output: PhantomData<fn() -> S>,
@@ -230,18 +231,29 @@ where
 
 impl<E> crate::animation::build::Unplaced for Iterative<E>
 where
-    E: IterativeEval + 'static,
+    E: IterativeEval + Clone + 'static,
     E::Output: Clone + Send + Sync + 'static,
 {
 }
 
-impl<E> crate::animation::build::IntoAnimNode for Iterative<E>
+impl<E> From<Iterative<E>> for crate::animation::def_node::AnimDefNode
 where
-    E: IterativeEval + 'static,
+    E: IterativeEval + Clone + 'static,
     E::Output: Clone + Send + Sync + 'static,
 {
-    fn into_anim_node(self) -> crate::animation::node::AnimNode {
-        crate::animation::node::AnimNode::from_eval(self, 1.0)
+    fn from(definition: Iterative<E>) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl<E> crate::animation::def_node::DynAnimDef for Iterative<E>
+where
+    E: IterativeEval + Clone + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+    fn build(&self) -> crate::animation::node::AnimNode {
+        let mut eval = Iterative::new(self.initial.clone(), self.eval.clone());
+        eval.sim_step = self.sim_step;
+        crate::animation::node::AnimNode::from_eval(eval, 1.0)
     }
 }
 

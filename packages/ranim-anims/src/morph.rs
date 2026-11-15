@@ -1,7 +1,7 @@
 //! Morph parameters and prepared geometry alignment.
 
 use ranim_core::{
-    animation::{definition::AnimRecipe, eval::Eval},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     traits::{Alignable, Interpolatable},
 };
 
@@ -43,21 +43,25 @@ pub struct MorphEval<T> {
     aligned_dst: T,
 }
 
-impl<T: MorphRequirement> AnimRecipe<T> for Morph<T> {
-    type Animation = MorphEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
+impl<T: MorphRequirement + Send + Sync + 'static> AnimRecipe<T> for Morph<T> {
+    fn build(&self, input: &T) -> AnimNode {
         let mut aligned_src = input.clone();
         let mut aligned_dst = self.target.clone();
         if !aligned_src.is_aligned(&aligned_dst) {
             aligned_src.align_with(&mut aligned_dst);
         }
-        MorphEval {
-            src: input.clone(),
-            dst: self.target.clone(),
-            aligned_src,
-            aligned_dst,
-        }
+        AnimNode::from_eval(
+            MorphEval {
+                src: input.clone(),
+                dst: self.target.clone(),
+                aligned_src,
+                aligned_dst,
+            },
+            1.0,
+        )
     }
+}
+impl<T: MorphRequirement + Send + Sync + 'static> AnimWriteBack<T> for Morph<T> {
     fn end_value(&self, _input: &T) -> T {
         self.target.clone()
     }

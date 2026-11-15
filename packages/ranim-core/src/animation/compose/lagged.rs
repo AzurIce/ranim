@@ -1,19 +1,18 @@
 //! Lagged (staggered, end-filled) authoring combinator.
 //!
-//! [`AnimLagged`] is build-time only: it staggers children by placing them
-//! on the content axis and lowers to nested children containing per-item
-//! tracks in [`IntoAnimNode::into_anim_node`] — no runtime kind of its own.
+//! [`AnimLagged`] staggers child definitions on the content axis. Conversion
+//! into [`AnimDefNode`] samples window edges and creates nested per-item tracks
+//! with constant fills, with no lagged runtime variant.
 
 use std::any::type_name;
 
-use crate::animation::build::{IntoAnimNode, Unplaced};
 use crate::animation::compose::sequence::AnimSequence;
-use crate::animation::node::{AnimNode, NodeContent, constant_node};
+use crate::animation::{build::Unplaced, def_node::AnimDefNode, eval::HeldOutput};
 
 /// How an [`AnimLagged`] fills the time outside a child's window.
 ///
-/// Fills are materialized as constant animation leaves at `build` time (sampled from
-/// the child's window edges), so the preview timeline shows exactly what is
+/// Fills are sampled from the child's window edges during conversion into
+/// [`AnimDefNode`], so the preview timeline shows exactly what is
 /// rendered — there is no hidden clamping rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LaggedFill {
@@ -35,8 +34,8 @@ pub enum LaggedFill {
 /// - in between — overlapping succession.
 ///
 /// By default the time outside a child's window is **filled with constant animation
-/// leaves** ([`LaggedFill::Hold`] on both ends): each item is materialized at
-/// build time as a per-item sequence track `[leading fill][anim][trailing
+/// leaves** ([`LaggedFill::Hold`] on both ends): conversion into [`AnimDefNode`]
+/// creates a per-item sequence track `[leading fill][anim][trailing
 /// fill]` spanning the whole extent — before its start the item shows its
 /// initial state, after its end it keeps showing its final state, and the
 /// preview timeline shows exactly what is rendered. Configure with
@@ -46,15 +45,12 @@ pub enum LaggedFill {
 /// holding it, give it an animation that ends hidden, e.g.
 /// `seq![item.anim_ref(FadeIn), item.hide()]`.
 ///
-/// Fills are sampled at build time: empty fills are skipped, and a
-/// zero-duration child gets no leading fill (it appears at its point, which is
-/// what "show from that point on" means). Because fills are build-time
-/// samples, children are expected to be pure (closed-form) animations — a
-/// stateful child's trailing fill would be its initial state, not its true
-/// final state.
+/// Fills are sampled during conversion into [`AnimDefNode`]: empty fills are skipped,
+/// and a zero-duration child gets no leading fill (it appears at its point,
+/// which is what "show from that point on" means).
 #[derive(ranim_macros::Animation)]
 pub struct AnimLagged {
-    animations: Vec<AnimNode>,
+    animations: Vec<AnimDefNode>,
     lag_ratio: f64,
     /// Start offset for the next pushed child.
     cursor_sec: f64,
@@ -101,17 +97,17 @@ impl AnimLagged {
 
     /// Add an animation, placed by the container's stagger rule.
     pub fn push<A: Unplaced + 'static>(&mut self, animation: A) -> &mut Self {
-        let mut animation = animation.into_anim_node();
+        let mut animation = animation.into();
         let duration_secs = animation.duration_secs();
         animation.shift_by(self.cursor_sec);
-        self.duration_secs = self.duration_secs.max(animation.time_range.end);
+        self.duration_secs = self.duration_secs.max(animation.time_range().end);
         self.animations.push(animation);
         self.cursor_sec += self.lag_ratio * duration_secs;
         self
     }
 
-    /// Materialize each child as a per-item sequence track:
-    /// `[leading fill][anim][trailing fill]` (empty fills skipped).
+    /// Arrange each child as a per-item sequence definition:
+    /// `[leading fill][anim][trailing fill]`, sampling the child's window edges.
     ///
     /// The lagged container is thus a stack of per-item sequences — each
     /// item's track spans the whole extent, with its window-edge states held
@@ -121,62 +117,64 @@ impl AnimLagged {
         let children = std::mem::take(&mut self.animations);
         let mut animations = Vec::with_capacity(children.len());
         for child in children {
-            let start = child.time_range.start;
-            let end = child.time_range.end;
+            let start = child.time_range().start;
+            let end = child.time_range().end;
             let mut track = AnimSequence::new();
             if self.leading == LaggedFill::Hold && start > 0.0 && child.duration_secs() > 0.0 {
                 let mut state = Vec::new();
-                child.capture_at(start, &mut state);
+                child.build().capture_at(start, &mut state);
                 if !state.is_empty() {
-                    track.animations.push(constant_node(state, 0.0..start));
+                    let mut held = AnimDefNode::leaf(HeldOutput::new(state));
+                    held.time_range = Some(0.0..start);
+                    track.animations.push(held);
                 }
             }
             track.animations.push(child);
             if self.trailing == LaggedFill::Hold && end < total {
-                let child = track.animations.last().unwrap();
                 let mut state = Vec::new();
-                child.capture_at(end, &mut state);
+                track
+                    .animations
+                    .last()
+                    .unwrap()
+                    .build()
+                    .capture_at(end, &mut state);
                 if !state.is_empty() {
-                    track.animations.push(constant_node(state, end..total));
+                    let mut held = AnimDefNode::leaf(HeldOutput::new(state));
+                    held.time_range = Some(end..total);
+                    track.animations.push(held);
                 }
             }
             track.cursor_sec = total;
-            animations.push(track.into_anim_node());
+            animations.push(track.into());
         }
         self.animations = animations;
     }
 
-    /// Current total extent (the last child's end).
+    /// Current total extent (the maximum child end).
     pub fn duration_secs(&self) -> f64 {
         self.duration_secs
     }
 
     /// Borrow the children as placed by the stagger rule — the
-    /// pre-materialization view, before `build` turns them into filled
+    /// pre-materialization view, before conversion turns them into filled
     /// tracks.
-    pub fn built_animations(&self) -> &[AnimNode] {
+    pub fn definitions(&self) -> &[AnimDefNode] {
         &self.animations
     }
 }
 
 impl Unplaced for AnimLagged {}
-impl IntoAnimNode for AnimLagged {
-    /// Desugar: materialize each item into a full-extent sequence track,
-    /// then lower the whole container to a runtime children node — the
-    /// stagger is ordinary window placement, so lagged needs no
-    /// runtime kind of its own. `anim_name` keeps the authoring identity.
-    fn into_anim_node(mut self) -> AnimNode {
-        self.materialize_fills();
-        let duration_secs = self.duration_secs;
-        AnimNode {
-            content: NodeContent::Children(self.animations),
-            internal_time_secs: duration_secs,
-            rate_func: None,
-            time_range: 0.0..duration_secs,
-            end_inclusive: true,
-            enabled: true,
-            anim_name: type_name::<Self>(),
-        }
+impl From<AnimLagged> for AnimDefNode {
+    /// Sample edge fills and arrange full-extent definition tracks.
+    /// Staggering is ordinary window placement, not a distinct node kind.
+    fn from(mut lagged: AnimLagged) -> Self {
+        lagged.materialize_fills();
+        let duration = lagged.duration_secs;
+        let mut node = Self::children(lagged.animations);
+        node.internal_time_secs = Some(duration);
+        node.time_range = Some(0.0..duration);
+        node.anim_name = Some(type_name::<AnimLagged>());
+        node
     }
 }
 

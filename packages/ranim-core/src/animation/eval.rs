@@ -79,6 +79,8 @@ pub trait Eval {
 /// `apply_to` to write an item's end state (or `apply_alpha_to` to write an
 /// arbitrary progress state) while constructing the animation.
 pub trait EvalExt: Eval + Sized {
+    // TODO: Eval should not participate in constructing animation, it
+    // should be just the evaluation core
     /// Explicitly opt a custom evaluator into the one-second playback adapter.
     fn into_animation(self) -> EvalAnim<Self> {
         EvalAnim(self)
@@ -101,31 +103,48 @@ impl<E: Eval + Sized> EvalExt for E {}
 
 /// Explicit playback adapter for a prepared custom evaluator.
 ///
-/// Unlike the removed `Eval -> IntoAnimNode` blanket implementation, using
-/// this wrapper deliberately selects a one-second default window.
+/// This definition retains a cloneable evaluator template and explicitly selects
+/// a one-second default window. Each build clones a fresh execution instance.
 pub struct EvalAnim<E>(pub E);
 
 impl<E> super::build::Unplaced for EvalAnim<E>
 where
-    E: Eval + 'static,
+    E: Eval + Clone + 'static,
     E::Output: Clone + Send + Sync + 'static,
 {
 }
 
-impl<E> super::build::IntoAnimNode for EvalAnim<E>
+impl<E> From<EvalAnim<E>> for super::def_node::AnimDefNode
 where
-    E: Eval + 'static,
+    E: Eval + Clone + 'static,
     E::Output: Clone + Send + Sync + 'static,
 {
-    fn into_anim_node(self) -> super::node::AnimNode {
-        super::node::AnimNode::from_eval(self.0, 1.0)
+    fn from(definition: EvalAnim<E>) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl<E> super::def_node::DynAnimDef for EvalAnim<E>
+where
+    E: Eval + Clone + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+    fn anim_name(&self) -> &'static str {
+        std::any::type_name::<E>()
+    }
+    fn build(&self) -> super::node::AnimNode {
+        super::node::AnimNode::from_eval(self.0.clone(), 1.0)
     }
 }
 
 impl<T: Clone + Send + Sync + 'static> super::build::Unplaced for Static<T> {}
-impl<T: Clone + Send + Sync + 'static> super::build::IntoAnimNode for Static<T> {
-    fn into_anim_node(self) -> super::node::AnimNode {
-        super::node::AnimNode::from_eval(self, 1.0)
+impl<T: Clone + Send + Sync + 'static> From<Static<T>> for super::def_node::AnimDefNode {
+    fn from(definition: Static<T>) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl<T: Clone + Send + Sync + 'static> super::def_node::DynAnimDef for Static<T> {
+    fn build(&self) -> super::node::AnimNode {
+        super::node::AnimNode::from_eval(self.clone(), 1.0)
     }
 }
 
@@ -212,6 +231,12 @@ pub(super) struct HeldOutput(Vec<DynOutput>);
 impl HeldOutput {
     pub(super) fn new(values: Vec<DynOutput>) -> Self {
         Self(values)
+    }
+}
+
+impl super::def_node::DynAnimDef for HeldOutput {
+    fn build(&self) -> super::node::AnimNode {
+        super::node::constant_node(self.0.clone(), 0.0..0.0)
     }
 }
 

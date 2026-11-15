@@ -2,18 +2,15 @@
 
 use std::any::type_name;
 
-use crate::animation::eval::DynOutput;
-
-use crate::animation::build::{IntoAnimNode, Unplaced};
-use crate::animation::node::{AnimNode, NodeContent, constant_node};
+use crate::animation::{build::Unplaced, def_node::AnimDefNode, eval::HeldOutput};
 
 /// Dynamic sequential animation container.
 ///
-/// `push` erases each direct child's Rust type while retaining its runtime
+/// `push` erases each direct child's Rust type while retaining its definition
 /// composition hierarchy in this sequence's local coordinates.
 #[derive(Default, ranim_macros::Animation)]
 pub struct AnimSequence {
-    pub(super) animations: Vec<AnimNode>,
+    pub(super) animations: Vec<AnimDefNode>,
     pub(super) cursor_sec: f64,
 }
 
@@ -23,20 +20,9 @@ impl AnimSequence {
         Self::default()
     }
 
-    fn eval_at_content_sec(&self, target_sec: f64, output: &mut Vec<DynOutput>) {
-        if let Some(animation) = self
-            .animations
-            .iter()
-            .rev()
-            .find(|animation| animation.contains_sec(target_sec, self.cursor_sec))
-        {
-            animation.capture_at(target_sec, output);
-        }
-    }
-
     /// Append an animation at the current cursor and advance by its local extent.
     pub fn push<A: Unplaced + 'static>(&mut self, animation: A) -> &mut Self {
-        let mut animation = animation.into_anim_node();
+        let mut animation = animation.into();
         let duration_secs = animation.duration_secs();
         animation.shift_by(self.cursor_sec);
         self.animations.push(animation);
@@ -76,7 +62,7 @@ impl AnimSequence {
         self
     }
 
-    /// Advance the cursor while holding the state immediately before it.
+    /// Advance the cursor while holding a snapshot of its preceding state.
     pub fn hold(&mut self, secs: f64) -> &mut Self {
         assert!(
             secs.is_finite() && secs >= 0.0,
@@ -86,14 +72,19 @@ impl AnimSequence {
             return self;
         }
 
-        let mut state = Vec::new();
-        self.eval_at_content_sec(self.cursor_sec, &mut state);
-
-        if !state.is_empty() {
-            self.animations.push(constant_node(
-                state,
-                self.cursor_sec..self.cursor_sec + secs,
-            ));
+        if let Some(animation) = self
+            .animations
+            .iter()
+            .rev()
+            .find(|animation| animation.contains_sec(self.cursor_sec, self.cursor_sec))
+        {
+            let mut state = Vec::new();
+            animation.build().capture_at(self.cursor_sec, &mut state);
+            if !state.is_empty() {
+                let mut held = AnimDefNode::leaf(HeldOutput::new(state));
+                held.time_range = Some(self.cursor_sec..self.cursor_sec + secs);
+                self.animations.push(held);
+            }
         }
         self.cursor_sec += secs;
         self
@@ -121,54 +112,47 @@ impl AnimSequence {
         self.cursor_sec
     }
 
-    /// Borrow the direct child animations in local sequence coordinates.
-    pub fn built_animations(&self) -> &[AnimNode] {
+    /// Borrow the direct child definitions in local sequence coordinates.
+    pub fn definitions(&self) -> &[AnimDefNode] {
         &self.animations
     }
 
-    /// Consume this sequence into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimNode> {
+    /// Consume this sequence into its direct child definitions.
+    pub fn into_definitions(self) -> Vec<AnimDefNode> {
         self.animations
     }
 }
 
 impl Unplaced for AnimSequence {}
-impl IntoAnimNode for AnimSequence {
-    /// Lower placements to children, discarding covered point animations and
-    /// excluding earlier endpoints when a final point supplies the final frame.
-    fn into_anim_node(self) -> AnimNode {
-        let duration_secs = self.cursor_sec;
-        // Point clips only match at the final content boundary. Holds have
-        // already sampled the authoring sequence, so earlier point clips can
-        // now be removed, including points covered by a later final clip.
-        let last_at_end = self
+impl From<AnimSequence> for AnimDefNode {
+    /// Retain placements, discarding covered points and excluding earlier endpoints.
+    fn from(sequence: AnimSequence) -> Self {
+        let duration_secs = sequence.cursor_sec;
+        // Holds have already captured their snapshots, so covered point clips
+        // can be discarded when converting the sequence into a definition node.
+        let last_at_end = sequence
             .animations
             .iter()
             .rposition(|animation| animation.contains_sec(duration_secs, duration_secs));
-        let children = self
+        let children = sequence
             .animations
             .into_iter()
             .enumerate()
             .filter_map(|(index, mut animation)| {
                 if animation.duration_secs() == 0.0 && Some(index) != last_at_end {
-                    None
-                } else {
-                    if animation.time_range.end == duration_secs && Some(index) != last_at_end {
-                        animation.end_inclusive = false;
-                    }
-                    Some(animation)
+                    return None;
                 }
+                if animation.time_range().end == duration_secs && Some(index) != last_at_end {
+                    animation.end_inclusive = Some(false);
+                }
+                Some(animation)
             })
             .collect();
-        AnimNode {
-            content: NodeContent::Children(children),
-            internal_time_secs: duration_secs,
-            rate_func: None,
-            time_range: 0.0..duration_secs,
-            end_inclusive: true,
-            enabled: true,
-            anim_name: type_name::<Self>(),
-        }
+        let mut node = Self::children(children);
+        node.internal_time_secs = Some(duration_secs);
+        node.time_range = Some(0.0..duration_secs);
+        node.anim_name = Some(type_name::<AnimSequence>());
+        node
     }
 }
 

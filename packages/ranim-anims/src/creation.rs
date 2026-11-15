@@ -1,7 +1,7 @@
 //! Creation and writing operation parameters.
 
 use ranim_core::{
-    animation::{definition::AnimRecipe, eval::Eval},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
 };
 use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
@@ -33,26 +33,34 @@ pub struct CreateEval<T> {
     reverse: bool,
 }
 
-impl<T: CreationRequirement> AnimRecipe<T> for Create {
-    type Animation = CreateEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
-        CreateEval {
-            original: input.clone(),
-            reverse: false,
-        }
+impl<T: CreationRequirement + Send + Sync + 'static> AnimRecipe<T> for Create {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(
+            CreateEval {
+                original: input.clone(),
+                reverse: false,
+            },
+            1.0,
+        )
     }
+}
+impl<T: CreationRequirement + Send + Sync + 'static> AnimWriteBack<T> for Create {
     fn end_value(&self, input: &T) -> T {
         input.clone()
     }
 }
-impl<T: CreationRequirement> AnimRecipe<T> for UnCreate {
-    type Animation = CreateEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
-        CreateEval {
-            original: input.clone(),
-            reverse: true,
-        }
+impl<T: CreationRequirement + Send + Sync + 'static> AnimRecipe<T> for UnCreate {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(
+            CreateEval {
+                original: input.clone(),
+                reverse: true,
+            },
+            1.0,
+        )
     }
+}
+impl<T: CreationRequirement + Send + Sync + 'static> AnimWriteBack<T> for UnCreate {
     fn end_value(&self, _input: &T) -> T {
         T::empty()
     }
@@ -99,20 +107,22 @@ fn prepare_write<T: WritingRequirement>(input: &T, reverse: bool) -> WriteEval<T
     }
 }
 
-impl<T: WritingRequirement> AnimRecipe<T> for Write {
-    type Animation = WriteEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
-        prepare_write(input, false)
+impl<T: WritingRequirement + Send + Sync + 'static> AnimRecipe<T> for Write {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(prepare_write(input, false), 1.0)
     }
+}
+impl<T: WritingRequirement + Send + Sync + 'static> AnimWriteBack<T> for Write {
     fn end_value(&self, input: &T) -> T {
         input.clone()
     }
 }
-impl<T: WritingRequirement> AnimRecipe<T> for Unwrite {
-    type Animation = WriteEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
-        prepare_write(input, true)
+impl<T: WritingRequirement + Send + Sync + 'static> AnimRecipe<T> for Unwrite {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(prepare_write(input, true), 1.0)
     }
+}
+impl<T: WritingRequirement + Send + Sync + 'static> AnimWriteBack<T> for Unwrite {
     fn end_value(&self, _input: &T) -> T {
         T::empty()
     }

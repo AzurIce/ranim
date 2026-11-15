@@ -185,6 +185,7 @@ fn render_note(note: Note, sec: f64, layout: PianoLayout, items: &mut Vec<VItem>
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct MidiNotesEval {
     pub(crate) song: Arc<MidiSong>,
     pub(crate) layout: PianoLayout,
@@ -213,6 +214,7 @@ impl Eval for MidiNotesEval {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct SingleNoteEval {
     note: Note,
     layout: PianoLayout,
@@ -252,6 +254,7 @@ impl Eval for SingleNoteEval {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct PianoKeyboardEval {
     pub(crate) song: Arc<MidiSong>,
     pub(crate) layout: PianoLayout,
@@ -334,6 +337,7 @@ impl Eval for PianoKeyboardEval {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct HitEffectsEval {
     pub(crate) song: Arc<MidiSong>,
     pub(crate) layout: PianoLayout,

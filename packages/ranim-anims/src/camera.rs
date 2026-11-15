@@ -1,7 +1,7 @@
 //! Camera orbit parameters and their prepared execution data.
 
 use ranim_core::{
-    animation::{definition::AnimRecipe, eval::Eval},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     glam::DVec3,
 };
 use ranim_items::camera::CameraFrame;
@@ -32,9 +32,8 @@ pub struct OrbitEval {
     angle: f64,
 }
 
-impl AnimRecipe<CameraFrame> for Orbit {
-    type Animation = OrbitEval;
-    fn build(&self, input: &CameraFrame) -> Self::Animation {
+impl Orbit {
+    fn prepare(&self, input: &CameraFrame) -> OrbitEval {
         let offset = input.pos - self.target;
         let distance = offset.length();
         let phi = if distance > 0.0 {
@@ -50,6 +49,18 @@ impl AnimRecipe<CameraFrame> for Orbit {
             theta0: offset.y.atan2(offset.x),
             angle: self.angle,
         }
+    }
+}
+
+impl AnimRecipe<CameraFrame> for Orbit {
+    fn build(&self, input: &CameraFrame) -> AnimNode {
+        AnimNode::from_eval(self.prepare(input), 1.0)
+    }
+}
+
+impl AnimWriteBack<CameraFrame> for Orbit {
+    fn end_value(&self, input: &CameraFrame) -> CameraFrame {
+        self.prepare(input).eval_alpha(1.0)
     }
 }
 

@@ -37,6 +37,7 @@ impl OrbitItem for Vec<VItem> {
 }
 
 /// A reusable orbital evaluator whose output keeps its concrete item type.
+#[derive(Clone)]
 struct OrbitMotion<T> {
     src: T,
     orbit_radius: f64,

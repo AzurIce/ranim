@@ -1,7 +1,7 @@
 //! Opacity animation parameters and prepared evaluators.
 
 use ranim_core::{
-    animation::{definition::AnimRecipe, eval::Eval},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     traits::{Interpolatable, Opacity},
 };
 
@@ -23,31 +23,39 @@ pub struct FadeEval<T> {
     dst: T,
 }
 
-impl<T: FadingRequirement> AnimRecipe<T> for FadeIn {
-    type Animation = FadeEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
+impl<T: FadingRequirement + Send + Sync + 'static> AnimRecipe<T> for FadeIn {
+    fn build(&self, input: &T) -> AnimNode {
         let mut src = input.clone();
         src.set_opacity(0.0);
-        FadeEval {
-            src,
-            dst: input.clone(),
-        }
+        AnimNode::from_eval(
+            FadeEval {
+                src,
+                dst: input.clone(),
+            },
+            1.0,
+        )
     }
+}
+impl<T: FadingRequirement + Send + Sync + 'static> AnimWriteBack<T> for FadeIn {
     fn end_value(&self, input: &T) -> T {
         input.clone()
     }
 }
 
-impl<T: FadingRequirement> AnimRecipe<T> for FadeOut {
-    type Animation = FadeEval<T>;
-    fn build(&self, input: &T) -> Self::Animation {
+impl<T: FadingRequirement + Send + Sync + 'static> AnimRecipe<T> for FadeOut {
+    fn build(&self, input: &T) -> AnimNode {
         let mut dst = input.clone();
         dst.set_opacity(0.0);
-        FadeEval {
-            src: input.clone(),
-            dst,
-        }
+        AnimNode::from_eval(
+            FadeEval {
+                src: input.clone(),
+                dst,
+            },
+            1.0,
+        )
     }
+}
+impl<T: FadingRequirement + Send + Sync + 'static> AnimWriteBack<T> for FadeOut {
     fn end_value(&self, input: &T) -> T {
         let mut result = input.clone();
         result.set_opacity(0.0);

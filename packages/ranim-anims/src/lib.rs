@@ -3,6 +3,7 @@
 //! `item.anim(params)` retains an owned input; `anim_ref` clones without
 //! changing it, and `anim_mut` also writes the terminal state back. Parameters
 //! implement `AnimRecipe<T>`; prepared evaluators implement `Eval` separately.
+//! Write-back operations additionally implement `AnimWriteBack<T>`.
 //!
 //! ```
 //! use ranim_core::prelude::*;
@@ -52,6 +53,18 @@ mod tests {
     };
     use std::f64::consts::PI;
 
+    fn sample<T, R>(definition: &AnimDef<T, R>, alpha: f64) -> T
+    where
+        T: Clone + Send + Sync + 'static,
+        R: AnimRecipe<T> + Clone + 'static,
+    {
+        let mut scene = RanimScene::new();
+        scene.play(definition.clone());
+        let mut frame = ranim_core::frame::EvaluatedFrame::new();
+        scene.seal().eval_at_alpha(alpha, &mut frame);
+        frame.items::<T>()[0].value.clone()
+    }
+
     #[derive(Clone)]
     struct OpacityValue(f64);
     impl Opacity for OpacityValue {
@@ -71,12 +84,12 @@ mod tests {
         let mut item = OpacityValue(0.5);
         let definition = item.anim_mut(FadeOut);
         assert_eq!(item.0, 0.0);
-        assert_eq!(definition.input.0, 0.5);
-        assert_eq!(definition.build().eval_alpha(0.5).0, 0.25);
-        let mut fade = definition.input.anim(FadeIn);
-        assert_eq!(fade.build().eval_alpha(0.0).0, 0.0);
-        fade.input.0 = 0.75;
-        assert_eq!(fade.build().eval_alpha(1.0).0, 0.75);
+        assert_eq!(definition.initial.0, 0.5);
+        assert_eq!(sample(&definition, 0.5).0, 0.25);
+        let mut fade = definition.initial.anim(FadeIn);
+        assert_eq!(sample(&fade, 0.0).0, 0.0);
+        fade.initial.0 = 0.75;
+        assert_eq!(sample(&fade, 1.0).0, 0.75);
     }
 
     #[test]
@@ -85,26 +98,23 @@ mod tests {
         let params = Morph::by(&input, |target| *target = DVec3::Y);
         let mut definition = input.anim_mut(params);
         assert_eq!(input, DVec3::Y);
-        assert_eq!(definition.input, DVec3::X);
-        assert_eq!(definition.params.target, DVec3::Y);
-        assert_eq!(
-            definition.build().eval_alpha(0.5),
-            (DVec3::X + DVec3::Y) * 0.5
-        );
-        definition.params.target = DVec3::Z;
-        assert_eq!(definition.build().eval_alpha(1.0), DVec3::Z);
+        assert_eq!(definition.initial, DVec3::X);
+        assert_eq!(definition.recipe.target, DVec3::Y);
+        assert_eq!(sample(&definition, 0.5), (DVec3::X + DVec3::Y) * 0.5);
+        definition.recipe.target = DVec3::Z;
+        assert_eq!(sample(&definition, 1.0), DVec3::Z);
     }
 
     #[test]
     fn rotation_prepares_pivot_and_uses_edited_parameters() {
         let mut definition = DVec3::X.anim(Rotate::at(PI, DVec3::Z, DVec3::ZERO));
-        assert!(definition.build().eval_alpha(1.0).distance(-DVec3::X) < 1e-10);
-        definition.params.angle = PI / 2.0;
-        assert!(definition.build().eval_alpha(1.0).distance(DVec3::Y) < 1e-10);
+        assert!(sample(&definition, 1.0).distance(-DVec3::X) < 1e-10);
+        definition.recipe.angle = PI / 2.0;
+        assert!(sample(&definition, 1.0).distance(DVec3::Y) < 1e-10);
         let mut item = DVec3::X;
         let definition = item.anim_mut(Rotate::at(PI, DVec3::Z, DVec3::ZERO));
         assert!(item.distance(-DVec3::X) < 1e-10);
-        assert_eq!(definition.input, DVec3::X);
+        assert_eq!(definition.initial, DVec3::X);
     }
 
     #[test]
@@ -114,54 +124,40 @@ mod tests {
             target: DVec3::ZERO,
             angle: PI / 2.0,
         });
-        assert!(
-            definition
-                .build()
-                .eval_alpha(1.0)
-                .pos
-                .distance(DVec3::Y * 3.0)
-                < 1e-9
-        );
-        definition.input.pos = DVec3::X * 4.0;
-        assert!(
-            definition
-                .build()
-                .eval_alpha(1.0)
-                .pos
-                .distance(DVec3::Y * 4.0)
-                < 1e-9
-        );
+        assert!(sample(&definition, 1.0).pos.distance(DVec3::Y * 3.0) < 1e-9);
+        definition.initial.pos = DVec3::X * 4.0;
+        assert!(sample(&definition, 1.0).pos.distance(DVec3::Y * 4.0) < 1e-9);
     }
 
     #[test]
     fn creation_and_writing_endpoints_and_write_back_are_preserved() {
         let original = VItem::from(Square::new(2.0));
         let empty = VItem::empty();
-        let create = original.anim_ref(Create).build();
-        assert_eq!(create.eval_alpha(0.0).vpoints.0, empty.vpoints.0);
-        assert_eq!(create.eval_alpha(1.0).vpoints.0, original.vpoints.0);
-        let uncreate = original.anim_ref(UnCreate).build();
-        assert_eq!(uncreate.eval_alpha(0.0).vpoints.0, original.vpoints.0);
-        assert_eq!(uncreate.eval_alpha(1.0).vpoints.0, empty.vpoints.0);
-        let write = original.anim_ref(Write).build();
-        assert_eq!(write.eval_alpha(1.0).vpoints.0, original.vpoints.0);
+        let create = original.anim_ref(Create);
+        assert_eq!(sample(&create, 0.0).vpoints.0, empty.vpoints.0);
+        assert_eq!(sample(&create, 1.0).vpoints.0, original.vpoints.0);
+        let uncreate = original.anim_ref(UnCreate);
+        assert_eq!(sample(&uncreate, 0.0).vpoints.0, original.vpoints.0);
+        assert_eq!(sample(&uncreate, 1.0).vpoints.0, empty.vpoints.0);
+        let write = original.anim_ref(Write);
+        assert_eq!(sample(&write, 1.0).vpoints.0, original.vpoints.0);
         let mut item = original.clone();
         let unwrite = item.anim_mut(Unwrite);
         assert_eq!(item.vpoints.0, empty.vpoints.0);
-        assert_eq!(unwrite.input.vpoints.0, original.vpoints.0);
-        assert_eq!(
-            unwrite.build().eval_alpha(0.0).vpoints.0,
-            original.vpoints.0
-        );
-        assert_eq!(unwrite.build().eval_alpha(1.0).vpoints.0, empty.vpoints.0);
+        assert_eq!(unwrite.initial.vpoints.0, original.vpoints.0);
+        assert_eq!(sample(&unwrite, 0.0).vpoints.0, original.vpoints.0);
+        assert_eq!(sample(&unwrite, 1.0).vpoints.0, empty.vpoints.0);
     }
 
     #[test]
-    fn runtime_introspection_resolves_the_parameter_type() {
+    fn retained_definition_identifies_the_recipe_type() {
         let mut scene = RanimScene::new();
         scene.play(OpacityValue(1.0).anim(FadeIn));
-        let info = scene.seal().get_animation_infos().remove(0);
-        assert_eq!(info.anim_name, std::any::type_name::<FadeIn>());
+        let scene = scene.seal();
+        assert_eq!(
+            scene.definition().definitions()[0].anim_name(),
+            std::any::type_name::<FadeIn>()
+        );
         assert_eq!(FadeIn::DESCRIPTOR.package, "ranim-anims");
     }
 }

@@ -180,11 +180,13 @@ impl RanimPreviewApp {
         let timeline = scene.build_scene();
         info!("Scene built, cost: {:?}", t.elapsed());
 
-        info!("Getting timelines info...");
-        let animation_infos = timeline.get_animation_infos();
         let total_secs = timeline.total_secs();
+        let timeline_state = TimelineState::new(total_secs, timeline.definition().definitions());
+        info!(
+            "Total {} root definitions",
+            timeline.definition().definitions().len()
+        );
         let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
-        info!("Total {} root animations", animation_infos.len());
 
         let playback_engine = PlaybackEngine::new(&evaluator);
 
@@ -193,7 +195,7 @@ impl RanimPreviewApp {
             title: scene.name.clone(),
             clear_color: wgpu::Color::TRANSPARENT,
             resolution: Resolution::QHD,
-            timeline_state: TimelineState::new(total_secs, animation_infos),
+            timeline_state,
             evaluator,
             need_eval: false,
             last_sec: -1.0,
@@ -243,11 +245,10 @@ impl RanimPreviewApp {
         info!("rebuilding scene after hotpatch...");
         let rebuilt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let timeline = self.scene.build_scene();
-            let infos = timeline.get_animation_infos();
             let total = timeline.total_secs();
+            let mut state = TimelineState::new(total, timeline.definition().definitions());
             let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
             let playback = PlaybackEngine::new(&evaluator);
-            let mut state = TimelineState::new(total, infos);
             state.current_sec = position.clamp(0.0, total);
             (evaluator, playback, state)
         }));
@@ -955,7 +956,8 @@ impl eframe::App for RanimPreviewApp {
                     .on_hover_text("Drag or enter the current time");
                 });
 
-                self.timeline_state.ui_main_timeline(ui);
+                self.timeline_state
+                    .ui_main_timeline(ui, self.evaluator.definition().definitions());
 
                 // Any direct playhead edit (slider, time input, timeline drag)
                 // must rebase the active clock so audio follows the picture.

@@ -3,7 +3,8 @@
 //! This is the closed core of the animation tree: [`NodeContent`] is the
 //! runtime vocabulary (children or a leaf), [`AnimNode`]
 //! wraps it with the timing shell, and all structural traversals — visual
-//! evaluation, seal-time audio baking, and preview introspection — live here.
+//! evaluation and seal-time audio baking — live here. Authoring tools read
+//! retained definitions in [`crate::animation::def_node`] instead.
 //!
 //! Authoring sugar (`AnimSequence`, `AnimStack`, `AnimLagged`) is layered on
 //! top in [`crate::animation::compose`]; user leaf protocols live in
@@ -11,42 +12,9 @@
 
 use std::ops::Range;
 
-use crate::{audio::AudioTrack, utils::rate_functions::linear};
+use crate::audio::AudioTrack;
 
 use super::eval::{DynOutput, Eval, EvalDyn, HeldOutput, OutputContext};
-
-/// Runtime animation content category used by preview tooling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AnimationInfoKind {
-    /// A typed evaluator without animation children.
-    Anim,
-    /// A container of animations placed in its local content coordinates.
-    Children,
-    /// An audio leaf: resolved into the audio plane at seal time.
-    Audio,
-}
-
-/// Hierarchical runtime animation information used by preview tooling.
-#[derive(Clone)]
-pub struct AnimationInfo {
-    /// Node display name, normally its concrete evaluator or container type name.
-    pub anim_name: String,
-    /// Runtime content category.
-    pub kind: AnimationInfoKind,
-    /// Time range in the parent content's local coordinates.
-    pub range: Range<f64>,
-    /// Duration of this node's inner content before outer timing is applied.
-    pub content_duration_secs: f64,
-    /// Time remapping function applied by this node.
-    pub rate_func: fn(f64) -> f64,
-    /// Whether this node contributes values during evaluation.
-    pub enabled: bool,
-    /// The content step of iterative segments (`1/N` progress per integration
-    /// step, `N` declared via `with_steps`); `None` for other nodes.
-    pub sim_step: Option<f64>,
-    /// Direct animation children in this node's content coordinates.
-    pub children: Vec<AnimationInfo>,
-}
 
 /// Runtime structure: either placed children or one leaf payload.
 ///
@@ -70,16 +38,6 @@ pub(in crate::animation) enum LeafContent {
     /// scanning (window checks over many nodes) is cache-bound — nodes stay
     /// slim, the track pays one indirection only when audible.
     Audio(Box<AudioTrack>),
-}
-
-impl NodeContent {
-    fn info_kind(&self) -> AnimationInfoKind {
-        match self {
-            NodeContent::Children(_) => AnimationInfoKind::Children,
-            NodeContent::Leaf(LeafContent::Anim(_)) => AnimationInfoKind::Anim,
-            NodeContent::Leaf(LeafContent::Audio(_)) => AnimationInfoKind::Audio,
-        }
-    }
 }
 
 /// A single runtime animation node: one closed [`NodeContent`] plus everything
@@ -181,11 +139,6 @@ impl AnimNode {
     /// Duration in seconds.
     pub fn duration_secs(&self) -> f64 {
         self.time_range.end - self.time_range.start
-    }
-
-    pub(in crate::animation) fn shift_by(&mut self, offset_sec: f64) {
-        self.time_range.start += offset_sec;
-        self.time_range.end += offset_sec;
     }
 
     /// Whether this clip contributes a value.
@@ -350,24 +303,11 @@ impl AnimNode {
             || (self.end_inclusive && sec == parent_duration && sec == self.time_range.end)
     }
 
-    /// Describe this node and its descendants for inspection tools.
-    pub fn animation_info(&self) -> AnimationInfo {
-        AnimationInfo {
-            anim_name: self.anim_name.to_string(),
-            kind: self.content.info_kind(),
-            range: self.time_range.clone(),
-            content_duration_secs: self.internal_time_secs,
-            rate_func: self.rate_func.unwrap_or(linear),
-            enabled: self.enabled,
-            sim_step: match &self.content {
-                NodeContent::Leaf(LeafContent::Anim(eval)) => eval.sim_step(),
-                _ => None,
-            },
-            children: self
-                .children()
-                .iter()
-                .map(AnimNode::animation_info)
-                .collect(),
+    /// The content step declared by an iterative visual leaf.
+    pub fn sim_step(&self) -> Option<f64> {
+        match &self.content {
+            NodeContent::Leaf(LeafContent::Anim(eval)) => eval.sim_step(),
+            _ => None,
         }
     }
 }

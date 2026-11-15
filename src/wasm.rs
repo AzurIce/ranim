@@ -120,7 +120,7 @@ impl WasmPreview {
     /// renderer's lifetime. Fetch once when a scene is ready, not each frame.
     pub fn timeline(&self) -> Result<JsValue, JsValue> {
         let renderer = self.renderer()?;
-        timeline::snapshot(renderer.duration(), renderer.animation_infos())
+        timeline::snapshot(renderer.duration(), renderer.definitions())
     }
 
     /// Copy the scene's baked mix into JavaScript-owned PCM channel arrays.

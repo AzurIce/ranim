@@ -1,24 +1,21 @@
-//! Read-only scene browser. Scene construction is lazy and runs off the UI thread.
+//! Read-only scene browser. Definitions are constructed lazily on the UI thread.
 //!
-//! This inspects the runtime hierarchy and registered type metadata, not arbitrary
+//! This inspects retained definitions and registered type metadata, not arbitrary
 //! evaluator fields. Registration alone does not imply KDL serialization support.
 
 use std::{
     collections::BTreeMap,
     panic::{AssertUnwindSafe, catch_unwind},
-    sync::mpsc::{self, Receiver},
     time::{Duration, Instant},
 };
 
 use eframe::egui;
-use ranim_core::animation::node::{AnimationInfo, AnimationInfoKind};
+use ranim_core::{RanimScene, animation::def_node::AnimDefNode};
 
 use crate::{AnimationRegistry, AppExt, RanimApp, Scene, SceneConstructor};
 
 struct SceneSnapshot {
-    duration: f64,
-    roots: Vec<AnimationInfo>,
-    nodes: usize,
+    scene: RanimScene,
     build_time: Duration,
 }
 
@@ -26,13 +23,9 @@ impl SceneSnapshot {
     fn build(scene: &Scene) -> Result<Self, String> {
         catch_unwind(AssertUnwindSafe(|| {
             let start = Instant::now();
-            let sealed = scene.build_scene();
-            let roots = sealed.get_animation_infos();
-            let nodes = count_nodes(&roots);
+            let definition = scene.build_definition();
             Self {
-                duration: sealed.total_secs(),
-                roots,
-                nodes,
+                scene: definition,
                 build_time: start.elapsed(),
             }
         }))
@@ -46,20 +39,20 @@ impl SceneSnapshot {
     }
 }
 
-fn count_nodes(roots: &[AnimationInfo]) -> usize {
+fn count_nodes(roots: &[AnimDefNode]) -> usize {
     roots
         .iter()
-        .map(|node| 1 + count_nodes(&node.children))
+        .map(|node| 1 + count_nodes(node.definitions()))
         .sum()
 }
 
-fn node_at_path<'a>(roots: &'a [AnimationInfo], path: &[usize]) -> Option<&'a AnimationInfo> {
+fn node_at_path<'a>(roots: &'a [AnimDefNode], path: &[usize]) -> Option<&'a AnimDefNode> {
     let (index, rest) = path.split_first()?;
     let node = roots.get(*index)?;
     if rest.is_empty() {
         Some(node)
     } else {
-        node_at_path(&node.children, rest)
+        node_at_path(node.definitions(), rest)
     }
 }
 
@@ -72,11 +65,13 @@ fn short_name(name: &str) -> &str {
         .unwrap_or(name)
 }
 
-fn kind_name(kind: AnimationInfoKind) -> &'static str {
-    match kind {
-        AnimationInfoKind::Anim => "Animation",
-        AnimationInfoKind::Children => "Container",
-        AnimationInfoKind::Audio => "Audio",
+fn kind_name(node: &AnimDefNode) -> &'static str {
+    if node.is_container() {
+        "Container"
+    } else if node.is_audio() {
+        "Audio"
+    } else {
+        "Animation"
     }
 }
 
@@ -90,7 +85,6 @@ pub struct InspectorApp {
     selected_scene: Option<usize>,
     selected_node: Vec<usize>,
     snapshots: BTreeMap<usize, Result<SceneSnapshot, String>>,
-    worker: Option<(usize, Receiver<Result<SceneSnapshot, String>>)>,
     expand_all: Option<bool>,
 }
 
@@ -111,54 +105,21 @@ impl InspectorApp {
             selected_scene: None,
             selected_node: Vec::new(),
             snapshots: BTreeMap::new(),
-            worker: None,
             expand_all: None,
         }
     }
 
-    fn update_worker(&mut self, ctx: &egui::Context) {
-        if let Some((index, receiver)) = &self.worker {
-            match receiver.try_recv() {
-                Ok(result) => {
-                    self.snapshots.insert(*index, result);
-                    self.worker = None;
-                }
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    self.snapshots
-                        .insert(*index, Err("Scene worker disconnected".into()));
-                    self.worker = None;
-                }
-                Err(mpsc::TryRecvError::Empty) => {}
-            }
-        }
-        // At most one constructor runs at a time, even when selection changes
-        // rapidly. Finished snapshots are reused until explicitly rebuilt.
-        if self.worker.is_none()
-            && let Some(index) = self.selected_scene
+    fn build_selected_scene(&mut self) {
+        if let Some(index) = self.selected_scene
             && !self.snapshots.contains_key(&index)
         {
-            let scene = self.scenes[index].clone();
-            let (sender, receiver) = mpsc::channel();
-            let repaint = ctx.clone();
-            match std::thread::Builder::new()
-                .name("ranim-inspector".into())
-                .spawn(move || {
-                    let _ = sender.send(SceneSnapshot::build(&scene));
-                    repaint.request_repaint();
-                }) {
-                Ok(_) => self.worker = Some((index, receiver)),
-                Err(error) => {
-                    self.snapshots.insert(index, Err(error.to_string()));
-                }
-            }
-        }
-        if self.worker.is_some() {
-            ctx.request_repaint_after(Duration::from_millis(100));
+            self.snapshots
+                .insert(index, SceneSnapshot::build(&self.scenes[index]));
         }
     }
 
     fn show(&mut self, ui: &mut egui::Ui) {
-        self.update_worker(ui.ctx());
+        self.build_selected_scene();
         egui::Panel::top("inspector-toolbar").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Ranim Inspector");
@@ -210,7 +171,7 @@ impl InspectorApp {
                 let node = self.selected_scene
                     .and_then(|index| self.snapshots.get(&index))
                     .and_then(|result| result.as_ref().ok())
-                    .and_then(|snapshot| node_at_path(&snapshot.roots, &self.selected_node));
+                    .and_then(|snapshot| node_at_path(snapshot.scene.root.definitions(), &self.selected_node));
                 if let Some(node) = node {
                     show_node_details(ui, node, &self.selected_node, &self.registry);
                 } else {
@@ -239,10 +200,7 @@ impl InspectorApp {
             };
             ui.heading(&self.scenes[index].name);
             ui.horizontal(|ui| {
-                if ui
-                    .add_enabled(self.worker.is_none(), egui::Button::new("Rebuild scene"))
-                    .clicked()
-                {
+                if ui.button("Rebuild scene").clicked() {
                     self.snapshots.remove(&index);
                     self.selected_node.clear();
                     ui.ctx().request_repaint();
@@ -259,9 +217,9 @@ impl InspectorApp {
                 Some(Ok(snapshot)) => {
                     ui.label(format!(
                         "{:.3} s · {} root nodes · {} total nodes · built in {:.2?}",
-                        snapshot.duration,
-                        snapshot.roots.len(),
-                        snapshot.nodes,
+                        snapshot.scene.root.duration_secs(),
+                        snapshot.scene.root.definitions().len(),
+                        count_nodes(snapshot.scene.root.definitions()),
                         snapshot.build_time
                     ));
                     ui.weak(
@@ -273,7 +231,7 @@ impl InspectorApp {
                             if let Some(open) = self.expand_all {
                                 set_descendant_expansion(
                                     ui,
-                                    &snapshot.roots,
+                                    snapshot.scene.root.definitions(),
                                     &mut Vec::new(),
                                     index,
                                     open,
@@ -281,14 +239,14 @@ impl InspectorApp {
                             }
                             show_tree(
                                 ui,
-                                &snapshot.roots,
+                                snapshot.scene.root.definitions(),
                                 &mut Vec::new(),
                                 &mut self.selected_node,
                                 &self.registry,
                                 index,
                             );
                         });
-                    if snapshot.roots.is_empty() {
+                    if snapshot.scene.root.definitions().is_empty() {
                         ui.weak("This scene has no animation nodes.");
                     }
                 }
@@ -317,7 +275,7 @@ impl eframe::App for InspectorApp {
 
 fn show_tree(
     ui: &mut egui::Ui,
-    nodes: &[AnimationInfo],
+    nodes: &[AnimDefNode],
     path: &mut Vec<usize>,
     selected: &mut Vec<usize>,
     registry: &AnimationRegistry,
@@ -325,19 +283,20 @@ fn show_tree(
 ) {
     for (index, node) in nodes.iter().enumerate() {
         path.push(index);
-        let registered = registry.resolve(&node.anim_name).is_some();
+        let registered = registry.resolve(node.anim_name()).is_some();
+        let range = node.time_range();
         let label = format!(
             "{}  [{:.3} … {:.3}]{}{}",
-            short_name(&node.anim_name),
-            node.range.start,
-            node.range.end,
-            if node.enabled { "" } else { " · disabled" },
+            short_name(node.anim_name()),
+            range.start,
+            range.end,
+            if node.enabled() { "" } else { " · disabled" },
             if registered { "" } else { " · unregistered" }
         );
-        if node.children.is_empty() {
+        if node.definitions().is_empty() {
             if ui
                 .selectable_label(*selected == *path, label)
-                .on_hover_text(&node.anim_name)
+                .on_hover_text(node.anim_name())
                 .clicked()
             {
                 *selected = path.clone();
@@ -353,14 +312,14 @@ fn show_tree(
                 .show_header(ui, |ui| {
                     if ui
                         .selectable_label(*selected == *path, label)
-                        .on_hover_text(&node.anim_name)
+                        .on_hover_text(node.anim_name())
                         .clicked()
                     {
                         *selected = path.clone();
                     }
                 })
                 .body(|ui| {
-                    show_tree(ui, &node.children, path, selected, registry, scene);
+                    show_tree(ui, node.definitions(), path, selected, registry, scene);
                 });
         }
         path.pop();
@@ -369,7 +328,7 @@ fn show_tree(
 
 fn set_descendant_expansion(
     ui: &egui::Ui,
-    nodes: &[AnimationInfo],
+    nodes: &[AnimDefNode],
     path: &mut Vec<usize>,
     scene: usize,
     open: bool,
@@ -381,7 +340,7 @@ fn set_descendant_expansion(
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, open);
         state.set_open(open);
         state.store(ui.ctx());
-        set_descendant_expansion(ui, &node.children, path, scene, open);
+        set_descendant_expansion(ui, node.definitions(), path, scene, open);
         path.pop();
     }
 }
@@ -394,12 +353,13 @@ fn property(ui: &mut egui::Ui, label: &str, value: impl Into<String>) {
 
 fn show_node_details(
     ui: &mut egui::Ui,
-    node: &AnimationInfo,
+    node: &AnimDefNode,
     path: &[usize],
     registry: &AnimationRegistry,
 ) {
-    ui.heading(short_name(&node.anim_name));
-    ui.label(egui::RichText::new(&node.anim_name).monospace().small());
+    let range = node.time_range();
+    ui.heading(short_name(node.anim_name()));
+    ui.label(egui::RichText::new(node.anim_name()).monospace().small());
     ui.separator();
     egui::Grid::new("node-properties")
         .num_columns(2)
@@ -413,42 +373,44 @@ fn show_node_details(
                     .collect::<Vec<_>>()
                     .join("/"),
             );
-            property(ui, "Kind", kind_name(node.kind));
-            property(ui, "Enabled", node.enabled.to_string());
-            property(ui, "Start (parent s)", format!("{:.6}", node.range.start));
-            property(ui, "End (parent s)", format!("{:.6}", node.range.end));
-            property(
-                ui,
-                "Duration (s)",
-                format!("{:.6}", node.range.end - node.range.start),
-            );
+            property(ui, "Kind", kind_name(node));
+            property(ui, "Enabled", node.enabled().to_string());
+            property(ui, "Start (parent s)", format!("{:.6}", range.start));
+            property(ui, "End (parent s)", format!("{:.6}", range.end));
+            property(ui, "Duration (s)", format!("{:.6}", node.duration_secs()));
             property(
                 ui,
                 "Content duration (s)",
-                format!("{:.6}", node.content_duration_secs),
+                format!("{:.6}", node.content_duration_secs()),
             );
-            property(ui, "Children", node.children.len().to_string());
-            property(ui, "Descendants", count_nodes(&node.children).to_string());
+            property(ui, "Children", node.definitions().len().to_string());
+            property(
+                ui,
+                "Descendants",
+                count_nodes(node.definitions()).to_string(),
+            );
             property(
                 ui,
                 "Simulation step",
-                node.sim_step
+                node.sim_step()
                     .map_or_else(|| "—".into(), |step| format!("{step:.8} progress")),
             );
         });
     ui.separator();
-    if let Some(descriptor) = registry.resolve(&node.anim_name) {
+    if let Some(descriptor) = registry.resolve(node.anim_name()) {
         ui.label("Registered animation family");
         ui.monospace(descriptor.id());
         ui.label(format!("{} {}", descriptor.package, descriptor.version));
     } else {
-        ui.label("Unregistered runtime type");
-        ui.weak("This node can run and be inspected, but has no registered family in this App. Closure adapters and captured holds are runtime-only unless wrapped by a named definition.");
+        ui.label("Unregistered definition type");
+        ui.weak(
+            "This definition can run and be inspected, but has no registered family in this App.",
+        );
     }
     ui.weak("Type registration is metadata only; it does not guarantee that parameters can be serialized.");
     ui.separator();
     ui.label("Rate function · local progress → content progress");
-    show_rate_curve(ui, node.rate_func);
+    show_rate_curve(ui, node.rate_func());
 }
 
 fn show_rate_curve(ui: &mut egui::Ui, rate: fn(f64) -> f64) {
@@ -524,7 +486,14 @@ pub fn run_app(project: RanimApp) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use crate::{App, RanimAppExt, RanimScene};
-    use ranim_core::animation::{build::PlaybackExt, eval::pure::Pure};
+    use ranim_core::animation::{
+        AnimRecipe,
+        build::PlaybackExt,
+        def_node::{AnimDef, AnimDefNodeContent, ItemAnimExt},
+        eval::{Static, pure::Pure},
+        node::AnimNode,
+    };
+    use std::rc::Rc;
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -532,22 +501,41 @@ mod tests {
 
     #[test]
     fn browsing_is_lazy_and_snapshots_preserve_unregistered_nodes() {
+        struct Recipe;
+        impl AnimRecipe<Rc<f64>> for Recipe {
+            fn build(&self, input: &Rc<f64>) -> AnimNode {
+                AnimNode::from_eval(Static(**input), 1.0)
+            }
+        }
         let builds = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&builds);
         let mut project = App::new();
         project.add_scene(Scene::new("sample", move |r: &mut RanimScene| {
             counter.fetch_add(1, Ordering::Relaxed);
-            r.play(Pure::new(|alpha| alpha).with_duration(2.0));
+            r.play(Rc::new(1.0).anim(Recipe).with_duration(2.0));
         }));
-        let app = InspectorApp::new(project.build());
+        let mut app = InspectorApp::new(project.build());
         assert_eq!(builds.load(Ordering::Relaxed), 0);
-        let snapshot = SceneSnapshot::build(&app.scenes[0]).unwrap();
-        assert_eq!(snapshot.duration, 2.0);
-        assert_eq!(snapshot.nodes, 1);
-        assert!(app.registry.resolve(&snapshot.roots[0].anim_name).is_none());
-        assert!(node_at_path(&snapshot.roots, &[0]).is_some());
-        assert!(node_at_path(&snapshot.roots, &[0, 0]).is_none());
-        assert!(node_at_path(&snapshot.roots, &[]).is_none());
+        app.selected_scene = Some(0);
+        app.build_selected_scene();
+        app.build_selected_scene();
+        assert_eq!(builds.load(Ordering::Relaxed), 1);
+        let snapshot = app.snapshots[&0].as_ref().unwrap();
+        let roots = snapshot.scene.root.definitions();
+        assert_eq!(snapshot.scene.root.duration_secs(), 2.0);
+        assert!(app.registry.resolve(roots[0].anim_name()).is_none());
+        let AnimDefNodeContent::Leaf(leaf) = &node_at_path(roots, &[0]).unwrap().content else {
+            panic!()
+        };
+        assert_eq!(
+            *leaf
+                .downcast_ref::<AnimDef<Rc<f64>, Recipe>>()
+                .unwrap()
+                .initial,
+            1.0
+        );
+        assert!(node_at_path(roots, &[0, 0]).is_none());
+        assert!(node_at_path(roots, &[]).is_none());
     }
 
     #[test]
@@ -576,7 +564,6 @@ mod tests {
         inspector.selected_node = vec![0, 0];
         inspector.expand_all = Some(true);
         egui::__run_test_ui(|ui| inspector.show(ui));
-        assert!(inspector.worker.is_none());
         inspector.expand_all = Some(false);
         egui::__run_test_ui(|ui| inspector.show(ui));
     }

@@ -2,8 +2,7 @@
 
 use std::any::type_name;
 
-use crate::animation::build::{IntoAnimNode, Unplaced};
-use crate::animation::node::{AnimNode, NodeContent};
+use crate::animation::{build::Unplaced, def_node::AnimDefNode};
 
 /// Dynamic overlay animation container.
 ///
@@ -11,7 +10,7 @@ use crate::animation::node::{AnimNode, NodeContent};
 /// time and the stack duration is the maximum child extent.
 #[derive(Default, ranim_macros::Animation)]
 pub struct AnimStack {
-    animations: Vec<AnimNode>,
+    animations: Vec<AnimDefNode>,
     duration_secs: f64,
 }
 
@@ -22,9 +21,9 @@ impl AnimStack {
     }
 
     /// Add an animation without advancing the other children.
-    pub fn push<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
-        let animation = animation.into_anim_node();
-        self.duration_secs = self.duration_secs.max(animation.time_range.end);
+    pub fn push<A: Into<AnimDefNode>>(&mut self, animation: A) -> &mut Self {
+        let animation = animation.into();
+        self.duration_secs = self.duration_secs.max(animation.time_range().end);
         self.animations.push(animation);
         self
     }
@@ -41,30 +40,26 @@ impl AnimStack {
         self.duration_secs
     }
 
-    /// Borrow the direct child animations in local stack coordinates.
-    pub fn built_animations(&self) -> &[AnimNode] {
+    /// Borrow the direct child definitions in local stack coordinates.
+    pub fn definitions(&self) -> &[AnimDefNode] {
         &self.animations
     }
 
-    /// Consume this stack into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimNode> {
+    /// Consume this stack into its direct child definitions.
+    pub fn into_definitions(self) -> Vec<AnimDefNode> {
         self.animations
     }
 }
 
 impl Unplaced for AnimStack {}
-impl IntoAnimNode for AnimStack {
-    fn into_anim_node(self) -> AnimNode {
-        let duration_secs = self.duration_secs;
-        AnimNode {
-            content: NodeContent::Children(self.animations),
-            internal_time_secs: duration_secs,
-            rate_func: None,
-            time_range: 0.0..duration_secs,
-            end_inclusive: true,
-            enabled: true,
-            anim_name: type_name::<Self>(),
-        }
+impl From<AnimStack> for AnimDefNode {
+    fn from(stack: AnimStack) -> Self {
+        let duration = stack.duration_secs;
+        let mut node = Self::children(stack.animations);
+        node.internal_time_secs = Some(duration);
+        node.time_range = Some(0.0..duration);
+        node.anim_name = Some(type_name::<AnimStack>());
+        node
     }
 }
 
@@ -81,7 +76,7 @@ macro_rules! stack {
     };
 }
 
-impl<A: IntoAnimNode + 'static> FromIterator<A> for AnimStack {
+impl<A: Into<AnimDefNode>> FromIterator<A> for AnimStack {
     fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
         let mut stack = AnimStack::new();
         for animation in iter {

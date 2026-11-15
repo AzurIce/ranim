@@ -2,7 +2,7 @@
 //!
 //! Identities describe type families, not codecs: registering `Rotate<T>` does
 //! not make `T`, closures, or evaluator caches serializable. Generic arguments
-//! remain visible in the concrete runtime type name.
+//! remain visible in the concrete recipe or definition type name.
 
 use std::collections::BTreeMap;
 
@@ -89,7 +89,7 @@ impl AnimationRegistry {
         self.types.get(id)
     }
 
-    /// Resolve a concrete runtime Rust name to its registered family.
+    /// Resolve a concrete recipe or definition Rust name to its registered family.
     ///
     /// Only the outer type is matched. In particular, a closure adapter does
     /// not inherit the registration of a type mentioned in its arguments.
