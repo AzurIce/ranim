@@ -63,8 +63,8 @@ use ranim::{
 
 ### Prelude 覆盖什么
 
-`ranim::prelude::*` 覆盖日常作者 API：`Eval` / `IntoAnimNode` / `Unplaced`
-/ `PlaybackExt` 等动画协议，`AnimSequence` / `AnimStack` / `AnimLagged` 与
+`ranim::prelude::*` 覆盖日常作者 API：`AnimDef` / `AnimDefNode`、`AnimRecipe` /
+`AnimWriteBack`、`Eval` / `Unplaced` / `PlaybackExt`，`AnimSequence` / `AnimStack` / `AnimLagged` 与
 `seq!` / `stack!` / `lagged!`，`Pure` / `Iterative` / `Static`，`Sound` /
 `AudioClip`，以及 `RanimScene` / `TimeMark` / `App` / `Plugin`。
 
@@ -73,12 +73,12 @@ use ranim::{
 ```rust
 use ranim_core::audio::AudioError;
 use ranim_core::animation::build::{At, Paramed};
-use ranim_core::animation::node::{AnimNode, AnimationInfo};
+use ranim_core::animation::node::AnimNode;
 use ranim_core::frame::EvaluatedFrame;
 ```
 
 - `EvaluatedFrame`：读取求值结果或直接驱动渲染时使用；
-- `AnimNode` / `AnimationInfo`：运行时 introspection API；
+- `AnimNode`：配方构建出的运行节点；Inspector 和 timeline 直接读取 `AnimDefNode` 定义树；
 - `At` / `Paramed`：需要给返回值命名的 timing wrapper；
 - `AudioError`：音频解码/文件错误处理。
 
@@ -327,7 +327,8 @@ r.play(layers);
 
 导入 `FadeIn`、`Morph`、`Write` 等参数类型后，通过 prelude 中的 `ItemAnimExt`
 统一绑定输入：`item.anim(params)` 接管输入，`anim_ref` 克隆输入，`anim_mut`
-克隆输入并将终态写回。返回的 `Anim<T, P>` 保留输入和参数，构建时才准备执行器。
+克隆输入并将终态写回，且要求配方实现 `AnimWriteBack<T>`。返回的
+`AnimDef<T, R>` 保留 `initial` 和 `recipe`；`build(&self)` 构建独立运行树而不消费定义。
 
 有些动画只对更底层的 `VItem` 实现。几何 item 可以通过 `VItem::from` 或 `.into()` 转换：
 

@@ -161,13 +161,15 @@ cargo run --example hello_ranim --no-default-features --features anims,cmd-rende
 cargo run --example hello_ranim --no-default-features --features anims,cmd-render -- inspect tree hello_ranim
 ```
 
-构建场景并输出层级动画树。每个节点包含：DFS `path`、`kind`
+构建场景定义并输出层级 Def 树，不展开配方 build 出的运行子树，也不烘焙音频。
+JSON 转换仅发生在输出边界。每个节点包含：DFS `path`、`kind`
 （anim/children/audio）、`anim_name`、父局部坐标下的 `range`、
 `content_duration_secs`、`rate_func`、`enabled` 与 `children`；iterative 节点
 额外包含 `sim_step`（`with_steps(N)` 声明的进度步长 `1/N`，未声明时为默认值）。
 当项目里只有一个场景时 `[SCENE]` 可省略。
 
-注意 `range` 是**父局部坐标**，不要直接当成全局时间。
+注意 `range` 是**父局部坐标**，不要直接当成全局时间。未显式覆盖的播放默认值
+可以通过临时 build 查询；这不会消费定义或把运行时子节点加入定义树。
 
 ### `inspect frame <SCENE> --at <sec>`
 

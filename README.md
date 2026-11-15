@@ -131,18 +131,26 @@ let turn = item.anim_mut(Rotate::new(angle, axis)); // also write back the final
 let exit = item.anim(FadeOut).with_duration(2.0); // consume input
 ```
 
-`Anim<T, P>` retains `input` and `params`; prepared runtime states are built at
-lowering, not stored in operation parameters. The old per-animation Item extension
-traits are replaced by `ItemAnimExt`. Custom `Eval` implementations explicitly use
-`.into_animation()` or `AnimNode::from_eval(eval, duration)` instead of receiving
-a playback window through a blanket implementation.
+`AnimDef<T, R>` retains `initial` and `recipe`; `AnimRecipe::build` constructs an
+independent runtime tree without consuming that definition. `ItemAnimExt` provides
+the input-binding methods; `anim_mut` additionally requires `AnimWriteBack<T>`.
+Custom cloneable `Eval` implementations use `.into_animation()` for a retained
+template, or `AnimNode::from_eval(eval, duration)` inside a recipe.
+
+Definition and runtime trees both use `Children / Leaf`, but one recipe leaf may
+build an entire runtime subtree. Playback wrappers and composition operate on
+definitions; rebuilding borrows them without replacing their inputs or recipes.
+See [animation architecture](./book/understand/core/anim.md) for type erasure,
+playback overrides, snapshot sampling, and the inspection/persistence boundary.
 
 #### Scene browser and animation inspector
 
 The `app` command opens a read-only egui browser: select a scene on the left,
-expand its animation tree, and select a node to inspect timing, rate curves,
-runtime type names, and registered crate metadata. Scenes build lazily on a
-worker thread; a failed constructor is reported without closing the browser.
+expand its definition tree, and select a node to inspect timing, rate curves,
+recipe type names, and registered crate metadata. Definitions build lazily on the
+UI thread; a failed constructor is reported without closing the browser.
+The browser and preview timeline read retained definitions directly, without
+expanding recipe-generated runtime subtrees.
 
 ```sh
 # Any project's run_cli entry (enabled by cmd-app, also included in cmd-preview):
@@ -162,7 +170,7 @@ struct MyAnimation {
     distance: f64,
 }
 
-// Implement Eval separately; deriving Animation only supplies type metadata.
+// Implement AnimRecipe separately; deriving Animation only supplies type metadata.
 let mut app = App::new();
 app.add_plugins(BuiltinAnimationsPlugin);
 app.register_animation::<MyAnimation>();
