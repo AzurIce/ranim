@@ -46,7 +46,7 @@ mod tests {
         morph::Morph,
         rotating::Rotate,
     };
-    use ranim_core::{animation::registry::Animation, glam::DVec3, prelude::*};
+    use ranim_core::{glam::DVec3, prelude::*};
     use ranim_items::{
         camera::CameraFrame,
         vitem::{VItem, geometry::Square},
@@ -158,6 +158,5 @@ mod tests {
             scene.definition().definitions()[0].anim_name(),
             std::any::type_name::<FadeIn>()
         );
-        assert_eq!(FadeIn::DESCRIPTOR.package, "ranim-anims");
     }
 }

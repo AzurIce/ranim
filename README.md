@@ -153,8 +153,8 @@ playback overrides, snapshot sampling, and the inspection/persistence boundary.
 
 The `app` command opens a read-only egui browser: select a scene on the left,
 expand its definition tree, and select a node to inspect timing, rate curves,
-recipe type names, and registered crate metadata. Definitions build lazily on the
-UI thread; a failed constructor is reported without closing the browser.
+and recipe type names. Definitions build lazily on the UI thread; a failed
+constructor is reported without closing the browser.
 The browser and preview timeline read retained definitions directly, without
 expanding recipe-generated runtime subtrees.
 
@@ -166,29 +166,10 @@ cargo run --example hello_ranim -- app
 cargo run -p ranim-examples --features cmd-app --bin examples-inspector
 ```
 
-Register animation metadata explicitly in your App or Plugin:
-
-```rust,ignore
-use ranim::prelude::*;
-
-#[derive(Animation)]
-struct MyAnimation {
-    distance: f64,
-}
-
-// Implement AnimRecipe separately; deriving Animation only supplies type metadata.
-let mut app = App::new();
-app.add_plugins(BuiltinAnimationsPlugin);
-app.register_animation::<MyAnimation>();
-```
-
-The derive captures the **defining** Cargo package name/version and module/type
-path. The registry describes generic type families; it does not assign persistent
-identities to generic arguments or provide serialization codecs. Re-registering
-identical metadata is harmless; conflicting identities are rejected. Unregistered
-animations, including closures and captured holds, remain inspectable and runnable.
-The Inspector exposes retained definitions and registered type metadata, not
-arbitrary input or recipe fields; it does not edit animations or save KDL.
+The Inspector reads definition structure and playback settings without animation
+type registration. Rust type names identify recipes for display; they are not
+persistent scene identities. The browser does not reflect arbitrary input or
+recipe fields, edit animations, or save KDL.
 
 #### Experimental scene hot reload
 

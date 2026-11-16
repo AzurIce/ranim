@@ -28,8 +28,6 @@ pub mod def_node;
 pub mod eval;
 /// Runtime animation nodes and their interpreters.
 pub mod node;
-/// Definition-site type identities and app-scoped registration.
-pub mod registry;
 /// Audio leaf animation: a sound placed and composed like any animation.
 pub mod sound;
 

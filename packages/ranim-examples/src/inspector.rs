@@ -1,14 +1,13 @@
 //! Browse every bundled example without combining their renderer configurations.
 
 #[cfg(not(target_family = "wasm"))]
-use ranim::{App, AppExt, BuiltinAnimationsPlugin, Plugin, RanimAppExt};
+use ranim::{App, AppExt, Plugin, RanimAppExt};
 #[cfg(not(target_family = "wasm"))]
 use ranim_examples::*;
 
 #[cfg(not(target_family = "wasm"))]
 fn project() -> ranim::RanimApp {
     let mut app = App::new();
-    app.add_plugins(BuiltinAnimationsPlugin);
 
     // Some examples register identically named scenes or mutually exclusive
     // render setups. Keep their assembly isolated, then collect only scene
@@ -90,12 +89,5 @@ mod tests {
                 .is_some()
         );
         assert!(app.scene("hello_ranim / hello_ranim").is_some());
-        assert!(
-            app.world()
-                .resource::<ranim::AnimationRegistry>()
-                .iter()
-                .len()
-                >= 10
-        );
     }
 }

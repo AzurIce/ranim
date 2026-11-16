@@ -11,29 +11,6 @@ use crate::scene::parse_scene_attrs;
 
 const RANIM_CRATE_NAME: &str = "ranim";
 
-/// Attach the defining Cargo package and module identity to an animation family.
-///
-/// This derives metadata only, not `Eval`, reflection, or a serialization codec.
-#[proc_macro_derive(Animation)]
-pub fn derive_animation(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let core = ranim_core_path();
-    let name = &input.ident;
-    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-    quote! {
-        impl #impl_generics #core::animation::registry::Animation for #name #type_generics #where_clause {
-            const DESCRIPTOR: #core::animation::registry::AnimationDescriptor =
-                #core::animation::registry::AnimationDescriptor {
-                    package: env!("CARGO_PKG_NAME"),
-                    version: env!("CARGO_PKG_VERSION"),
-                    module_path: module_path!(),
-                    name: stringify!(#name),
-                    rust_path: concat!(module_path!(), "::", stringify!(#name)),
-                };
-        }
-    }.into()
-}
-
 fn ranim_path() -> proc_macro2::TokenStream {
     match crate_name(RANIM_CRATE_NAME) {
         Ok(FoundCrate::Name(name)) => {

@@ -8,7 +8,7 @@ use crate::animation::{build::Unplaced, def_node::AnimDefNode};
 ///
 /// Unlike [`AnimSequence`](super::sequence::AnimSequence), every pushed animation keeps its own local start
 /// time and the stack duration is the maximum child extent.
-#[derive(Default, ranim_macros::Animation)]
+#[derive(Default)]
 pub struct AnimStack {
     animations: Vec<AnimDefNode>,
     duration_secs: f64,

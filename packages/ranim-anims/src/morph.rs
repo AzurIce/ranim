@@ -10,7 +10,7 @@ pub trait MorphRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> MorphRequirement for T {}
 
 /// Interpolate an input item to an explicit destination.
-#[derive(Clone, ranim_macros::Animation)]
+#[derive(Clone)]
 pub struct Morph<T> {
     /// Destination before runtime alignment is performed.
     pub target: T,

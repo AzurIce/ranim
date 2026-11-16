@@ -14,7 +14,7 @@ pub trait RotatingRequirement: RotateTransform + ShiftTransformExt + Clone {}
 impl<T: RotateTransform + ShiftTransformExt + Clone> RotatingRequirement for T {}
 
 /// Rotation inputs. The pivot is resolved against the original input at build time.
-#[derive(Clone, ranim_macros::Animation)]
+#[derive(Clone)]
 pub struct Rotate<A = AabbPoint> {
     /// Rotation angle, in radians.
     pub angle: f64,

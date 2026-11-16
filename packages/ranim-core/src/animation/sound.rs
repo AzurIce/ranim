@@ -34,7 +34,6 @@ use crate::animation::{
 ///     square.anim_ref(Write),
 /// ]
 /// ```
-#[derive(ranim_macros::Animation)]
 pub struct Sound {
     track: AudioTrack,
 }

@@ -687,8 +687,8 @@ let animation = Iterative::from_fn(
 反射或场景持久化能力：
 
 - `Any` 提供的是已知具体类型的 downcast，不会自动枚举未知类型的字段。
-- `Animation` derive 和 App 中的注册表描述定义类型家族及其包名、版本、类型身份，
-  不会为输入、泛型参数、闭包或函数指针生成序列化 codec。
+- Inspector 使用 Rust 类型名显示配方，不要求动画类型注册。这些名称不是持久化的
+  场景身份，也不为输入、配方、闭包或函数指针提供序列化 codec。
 - `inspect tree` 的 JSON 和 WASM timeline 数据只在输出边界从定义树生成可传输的
   属性快照；它们不是能够还原任意 `AnimDef<T, R>` 的完整场景文件。
 

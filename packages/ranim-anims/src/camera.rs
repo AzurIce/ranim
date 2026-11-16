@@ -7,7 +7,7 @@ use ranim_core::{
 use ranim_items::camera::CameraFrame;
 
 /// Orbit around a target in the XY plane (Z-up).
-#[derive(Clone, Copy, Debug, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug)]
 pub struct Orbit {
     /// Orbit target.
     pub target: DVec3,

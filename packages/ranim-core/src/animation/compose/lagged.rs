@@ -48,7 +48,6 @@ pub enum LaggedFill {
 /// Fills are sampled during conversion into [`AnimDefNode`]: empty fills are skipped,
 /// and a zero-duration child gets no leading fill (it appears at its point,
 /// which is what "show from that point on" means).
-#[derive(ranim_macros::Animation)]
 pub struct AnimLagged {
     animations: Vec<AnimDefNode>,
     lag_ratio: f64,

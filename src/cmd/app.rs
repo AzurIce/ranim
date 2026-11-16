@@ -1,7 +1,7 @@
 //! Read-only scene browser. Definitions are constructed lazily on the UI thread.
 //!
-//! This inspects retained definitions and registered type metadata, not arbitrary
-//! evaluator fields. Registration alone does not imply KDL serialization support.
+//! This inspects retained definition trees and playback settings, not arbitrary
+//! input or recipe fields. It does not provide scene serialization.
 
 use std::{
     collections::BTreeMap,
@@ -12,7 +12,7 @@ use std::{
 use eframe::egui;
 use ranim_core::{RanimScene, animation::def_node::AnimDefNode};
 
-use crate::{AnimationRegistry, AppExt, RanimApp, Scene, SceneConstructor};
+use crate::{AppExt, RanimApp, Scene, SceneConstructor};
 
 struct SceneSnapshot {
     scene: RanimScene,
@@ -75,12 +75,11 @@ fn kind_name(node: &AnimDefNode) -> &'static str {
     }
 }
 
-/// An inspector for the scenes and animation registrations of an assembled App.
+/// An inspector for the scenes and retained animation definitions of an assembled App.
 pub struct InspectorApp {
     // Keep project resources alive for captured scene constructors.
     _project: RanimApp,
     scenes: Vec<Scene>,
-    registry: AnimationRegistry,
     filter: String,
     selected_scene: Option<usize>,
     selected_node: Vec<usize>,
@@ -92,15 +91,9 @@ impl InspectorApp {
     /// Create an inspector without building any scenes or initializing a renderer.
     pub fn new(project: RanimApp) -> Self {
         let scenes = project.scenes().to_vec();
-        let registry = project
-            .world()
-            .get_resource::<AnimationRegistry>()
-            .cloned()
-            .unwrap_or_default();
         Self {
             _project: project,
             scenes,
-            registry,
             filter: String::new(),
             selected_scene: None,
             selected_node: Vec::new(),
@@ -125,12 +118,8 @@ impl InspectorApp {
                 ui.heading("Ranim Inspector");
                 ui.separator();
                 ui.label(format!("{} scenes", self.scenes.len()));
-                ui.label(format!(
-                    "{} registered animation families",
-                    self.registry.iter().len()
-                ));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.weak("Read-only · no serialization codecs");
+                    ui.weak("Read-only");
                 });
             });
         });
@@ -165,29 +154,29 @@ impl InspectorApp {
                     });
             });
 
-        egui::Panel::right("inspector-properties").default_size(340.0).min_size(230.0).resizable(true).show(ui, |ui| {
-            ui.heading("Inspector");
-            egui::ScrollArea::vertical().id_salt("properties").show(ui, |ui| {
-                let node = self.selected_scene
-                    .and_then(|index| self.snapshots.get(&index))
-                    .and_then(|result| result.as_ref().ok())
-                    .and_then(|snapshot| node_at_path(snapshot.scene.root.definitions(), &self.selected_node));
-                if let Some(node) = node {
-                    show_node_details(ui, node, &self.selected_node, &self.registry);
-                } else {
-                    ui.weak("Select an animation node to inspect it.");
-                }
-                ui.separator();
-                egui::CollapsingHeader::new("Registered animation families").show(ui, |ui| {
-                    if self.registry.iter().len() == 0 {
-                        ui.weak("Add BuiltinAnimationsPlugin or register custom animations in a Plugin.");
-                    }
-                    for descriptor in self.registry.iter() {
-                        ui.label(descriptor.id()).on_hover_text(format!("{} {}\n{}", descriptor.package, descriptor.version, descriptor.rust_path));
-                    }
-                });
+        egui::Panel::right("inspector-properties")
+            .default_size(340.0)
+            .min_size(230.0)
+            .resizable(true)
+            .show(ui, |ui| {
+                ui.heading("Inspector");
+                egui::ScrollArea::vertical()
+                    .id_salt("properties")
+                    .show(ui, |ui| {
+                        let node = self
+                            .selected_scene
+                            .and_then(|index| self.snapshots.get(&index))
+                            .and_then(|result| result.as_ref().ok())
+                            .and_then(|snapshot| {
+                                node_at_path(snapshot.scene.root.definitions(), &self.selected_node)
+                            });
+                        if let Some(node) = node {
+                            show_node_details(ui, node, &self.selected_node);
+                        } else {
+                            ui.weak("Select an animation node to inspect it.");
+                        }
+                    });
             });
-        });
 
         egui::CentralPanel::default().show(ui, |ui| {
             let Some(index) = self.selected_scene else {
@@ -242,7 +231,6 @@ impl InspectorApp {
                                 snapshot.scene.root.definitions(),
                                 &mut Vec::new(),
                                 &mut self.selected_node,
-                                &self.registry,
                                 index,
                             );
                         });
@@ -278,20 +266,17 @@ fn show_tree(
     nodes: &[AnimDefNode],
     path: &mut Vec<usize>,
     selected: &mut Vec<usize>,
-    registry: &AnimationRegistry,
     scene: usize,
 ) {
     for (index, node) in nodes.iter().enumerate() {
         path.push(index);
-        let registered = registry.resolve(node.anim_name()).is_some();
         let range = node.time_range();
         let label = format!(
-            "{}  [{:.3} … {:.3}]{}{}",
+            "{}  [{:.3} … {:.3}]{}",
             short_name(node.anim_name()),
             range.start,
             range.end,
-            if node.enabled() { "" } else { " · disabled" },
-            if registered { "" } else { " · unregistered" }
+            if node.enabled() { "" } else { " · disabled" }
         );
         if node.definitions().is_empty() {
             if ui
@@ -319,7 +304,7 @@ fn show_tree(
                     }
                 })
                 .body(|ui| {
-                    show_tree(ui, node.definitions(), path, selected, registry, scene);
+                    show_tree(ui, node.definitions(), path, selected, scene);
                 });
         }
         path.pop();
@@ -351,12 +336,7 @@ fn property(ui: &mut egui::Ui, label: &str, value: impl Into<String>) {
     ui.end_row();
 }
 
-fn show_node_details(
-    ui: &mut egui::Ui,
-    node: &AnimDefNode,
-    path: &[usize],
-    registry: &AnimationRegistry,
-) {
+fn show_node_details(ui: &mut egui::Ui, node: &AnimDefNode, path: &[usize]) {
     let range = node.time_range();
     ui.heading(short_name(node.anim_name()));
     ui.label(egui::RichText::new(node.anim_name()).monospace().small());
@@ -396,18 +376,6 @@ fn show_node_details(
                     .map_or_else(|| "—".into(), |step| format!("{step:.8} progress")),
             );
         });
-    ui.separator();
-    if let Some(descriptor) = registry.resolve(node.anim_name()) {
-        ui.label("Registered animation family");
-        ui.monospace(descriptor.id());
-        ui.label(format!("{} {}", descriptor.package, descriptor.version));
-    } else {
-        ui.label("Unregistered definition type");
-        ui.weak(
-            "This definition can run and be inspected, but has no registered family in this App.",
-        );
-    }
-    ui.weak("Type registration is metadata only; it does not guarantee that parameters can be serialized.");
     ui.separator();
     ui.label("Rate function · local progress → content progress");
     show_rate_curve(ui, node.rate_func());
@@ -500,7 +468,7 @@ mod tests {
     };
 
     #[test]
-    fn browsing_is_lazy_and_snapshots_preserve_unregistered_nodes() {
+    fn browsing_is_lazy_and_preserves_non_send_inputs() {
         struct Recipe;
         impl AnimRecipe<Rc<f64>> for Recipe {
             fn build(&self, input: &Rc<f64>) -> AnimNode {
@@ -523,7 +491,6 @@ mod tests {
         let snapshot = app.snapshots[&0].as_ref().unwrap();
         let roots = snapshot.scene.root.definitions();
         assert_eq!(snapshot.scene.root.duration_secs(), 2.0);
-        assert!(app.registry.resolve(roots[0].anim_name()).is_none());
         let AnimDefNodeContent::Leaf(leaf) = &node_at_path(roots, &[0]).unwrap().content else {
             panic!()
         };

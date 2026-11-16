@@ -253,7 +253,7 @@ impl EvalDyn for HeldOutput {
 }
 
 /// A constant evaluator.
-#[derive(Clone, ranim_macros::Animation)]
+#[derive(Clone)]
 pub struct Static<T: Clone>(pub T);
 
 impl<T: Clone> Eval for Static<T> {

@@ -15,16 +15,16 @@ pub trait WritingRequirement: CreationRequirement + StrokeWidth + StrokeColor + 
 impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequirement for T {}
 
 /// Reveal an item progressively.
-#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Create;
 /// Remove an item progressively.
-#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct UnCreate;
 /// Draw the outline, then restore the original fill.
-#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Write;
 /// Remove the fill, then erase the outline.
-#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Unwrite;
 
 /// Prepared progressive creation or removal.

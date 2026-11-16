@@ -8,7 +8,7 @@ use crate::animation::{build::Unplaced, def_node::AnimDefNode, eval::HeldOutput}
 ///
 /// `push` erases each direct child's Rust type while retaining its definition
 /// composition hierarchy in this sequence's local coordinates.
-#[derive(Default, ranim_macros::Animation)]
+#[derive(Default)]
 pub struct AnimSequence {
     pub(super) animations: Vec<AnimDefNode>,
     pub(super) cursor_sec: f64,

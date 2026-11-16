@@ -10,11 +10,11 @@ pub trait FadingRequirement: Opacity + Interpolatable + Clone {}
 impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 
 /// Fade from transparent to the input item's original opacity.
-#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct FadeIn;
 
 /// Fade from the input item's opacity to transparent.
-#[derive(Clone, Copy, Debug, Default, ranim_macros::Animation)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct FadeOut;
 
 /// Prepared opacity interpolation; derived states are not construction parameters.
