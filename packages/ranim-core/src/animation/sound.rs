@@ -16,8 +16,11 @@ use std::ops::Range;
 
 use crate::audio::{AudioClip, AudioTrack};
 
-use crate::animation::build::{IntoAnimNode, Unplaced};
 use crate::animation::node::{AnimNode, LeafContent, NodeContent};
+use crate::animation::{
+    build::Unplaced,
+    def_node::{AnimDefNode, DynAnimDef},
+};
 
 /// An audio leaf: plays a clip's span inside its placed window.
 ///
@@ -26,9 +29,9 @@ use crate::animation::node::{AnimNode, LeafContent, NodeContent};
 ///
 /// ```ignore
 /// seq![
-///     square.fade_in(),
+///     square.anim_ref(FadeIn),
 ///     Sound::new(narration),          // plays while the next cells run
-///     square.write(),
+///     square.anim_ref(Write),
 /// ]
 /// ```
 pub struct Sound {
@@ -81,11 +84,16 @@ impl Sound {
 }
 
 impl Unplaced for Sound {}
-impl IntoAnimNode for Sound {
-    fn into_anim_node(self) -> AnimNode {
+impl From<Sound> for AnimDefNode {
+    fn from(definition: Sound) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl DynAnimDef for Sound {
+    fn build(&self) -> AnimNode {
         let window = self.duration_secs();
         AnimNode {
-            content: NodeContent::Leaf(LeafContent::Audio(Box::new(self.track))),
+            content: NodeContent::Leaf(LeafContent::Audio(Box::new(self.track.clone()))),
             internal_time_secs: window,
             rate_func: None,
             time_range: 0.0..window,

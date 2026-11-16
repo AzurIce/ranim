@@ -1,7 +1,11 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
+    anims::{
+        creation::{Unwrite, Write},
+        fading::{FadeIn, FadeOut},
+        morph::Morph,
+    },
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -25,12 +29,12 @@ fn hello_ranim(r: &mut RanimScene) {
     let mut vitem = VItem::from(square.clone());
 
     let seq = seq![
-        square.fade_in().with_rate_func(smooth),
-        vitem.morph_to(circle).with_rate_func(smooth),
+        square.anim_mut(FadeIn).with_rate_func(smooth),
+        vitem.anim_mut(Morph::to(circle)).with_rate_func(smooth),
         vitem.show(),
-        vitem.clone().unwrite().with_rate_func(smooth),
-        vitem.write().with_rate_func(smooth),
-        vitem.fade_out().with_rate_func(smooth),
+        vitem.anim_ref(Unwrite).with_rate_func(smooth),
+        vitem.anim_mut(Write).with_rate_func(smooth),
+        vitem.anim_mut(FadeOut).with_rate_func(smooth),
     ];
     r.play(
         CameraFrame::default()
@@ -48,7 +52,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
+    let mut content = seq![square.anim_ref(FadeIn).with_rate_func(smooth)];
 
     let circle: VItem = Circle::new(2.0)
         .with(|circle| {
@@ -58,12 +62,12 @@ fn hello_ranim_chained(r: &mut RanimScene) {
 
     let mut vitem = VItem::from(square);
     content
-        .push(vitem.morph_to(circle).with_rate_func(smooth))
+        .push(vitem.anim_mut(Morph::to(circle)).with_rate_func(smooth))
         .hold(1.0)
         .extend(seq![
-            vitem.clone().unwrite().with_rate_func(smooth),
-            vitem.write().with_rate_func(smooth),
-            vitem.fade_out().with_rate_func(smooth),
+            vitem.anim_ref(Unwrite).with_rate_func(smooth),
+            vitem.anim_mut(Write).with_rate_func(smooth),
+            vitem.anim_mut(FadeOut).with_rate_func(smooth),
         ]);
 
     r.play(

@@ -44,6 +44,31 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
   （wgpu、eframe/egui、25+ 个 example），可能耗尽内存导致整机卡死
   （在 32 核 / 29 GiB 内存上实际发生过）。建议限制并行度或分包测试。
 
+## Test Design
+
+Keep the suite small and intentional. A test earns its place only if it catches
+a regression the compiler cannot.
+
+Write a test when it guards one of:
+
+- **A key boundary** — empty input, zero/negative/NaN/inf, exact end points,
+  ordering, first/last element.
+- **A strong contract** — type erasure and downcast, retention vs. construction,
+  overrides preserving defaults, public API shape, wire/serialization format.
+- **Logic that keeps changing** — time remapping, placement math, feature-gated
+  fallbacks, anything that has already regressed once.
+
+Do not test what is obvious from the code or already enforced by the type
+system: trivial accessors, struct forwarding, "a field holds what was just
+assigned", an empty collection staying empty, or a capability already covered
+by another test. Prefer one focused test over several variants of the same
+path — merge overlapping cases and drop assertions that only restate the
+implementation.
+
+When a change adds tests, remove the redundant ones it replaces instead of
+leaving them behind to "cover the diff". A smaller suite that fails for real
+reasons is worth more than a large one nobody reads.
+
 ## Website example media（shadow 管理）
 
 `website/static/examples/` 下的渲染产物（mp4/png）**不入库**，由

@@ -21,3 +21,7 @@ pub use render::{
 pub mod preview;
 #[cfg(all(not(target_family = "wasm"), feature = "cmd-preview"))]
 pub use preview::preview_scene;
+
+/// The scene browser and read-only animation inspector.
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-app"))]
+pub mod app;

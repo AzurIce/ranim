@@ -10,6 +10,7 @@ use ranim::{
 // Custom animation: rotate each sphere's rigid placement around the group
 // center on the Z axis. The orbit is composed outward from the vertex offset:
 // `T(group_center) ∘ Rz(angle) ∘ T(vertex_offset)`.
+#[derive(Clone)]
 struct RotateAroundZ {
     src: Transformed<Surface, Rigid>,
     group_center: DVec3,
@@ -81,6 +82,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 total_angle: TAU,
             }
             .apply_to(&mut surface)
+            .into_animation()
             .with_duration(8.0)
             .with_rate_func(linear),
         );
@@ -105,6 +107,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 total_angle: TAU,
             }
             .apply_to(&mut surface)
+            .into_animation()
             .with_duration(8.0)
             .with_rate_func(linear),
         );

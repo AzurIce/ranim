@@ -6,9 +6,9 @@ use std::{f64::consts::PI, time::Duration};
 use glam::{DVec3, dvec3};
 use ranim::{
     anims::{
-        creation::{CreationAnim, WritingAnim},
-        fading::FadingAnim,
-        morph::MorphAnim,
+        creation::{Create, Write},
+        fading::FadeIn,
+        morph::Morph,
     },
     color::palettes::{
         css,
@@ -37,11 +37,11 @@ fn test(r: &mut RanimScene) {
     }));
     let mut content = seq![
         square
-            .morph(|x| {
+            .anim_mut(Morph::to(square.clone().with(|x| {
                 x.with_origin(AabbPoint::CENTER, |x| {
                     x.rotate_on_y(PI / 2.0);
                 });
-            })
+            })))
             .with_rate_func(smooth)
     ];
     content.hold(1.0);

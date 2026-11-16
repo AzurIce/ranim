@@ -2,7 +2,7 @@ use ranim::glam;
 
 use glam::DVec3;
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim},
+    anims::{creation::Write, fading::FadeIn},
     color::palettes::manim,
     core::animation::eval::StaticAnim,
     items::vitem::{VItem, svg::SvgItem, typst::typst_svg},
@@ -39,14 +39,16 @@ fn basic(r: &mut RanimScene) {
     );
 
     let mut svg_sequence = AnimSequence::new();
-    svg_sequence
-        .hold(0.2)
-        .push(svg.fade_in().with_duration(3.0).with_rate_func(smooth));
+    svg_sequence.hold(0.2).push(
+        svg.anim_mut(FadeIn)
+            .with_duration(3.0)
+            .with_rate_func(smooth),
+    );
 
     let mut text_sequence = AnimSequence::new();
     text_sequence.hold(0.2).push(
         text.iter_mut()
-            .map(|item| item.write().with_rate_func(smooth))
+            .map(|item| item.anim_mut(Write).with_rate_func(smooth))
             .into_lagged(0.2)
             .with_duration(3.0),
     );

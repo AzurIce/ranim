@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::rotating::RotatingAnim,
+    anims::rotating::Rotate,
     color::palettes::manim,
     core::animation::eval::StaticAnim,
     glam::{DVec3, dvec2, dvec3},
@@ -172,7 +172,9 @@ fn aabb(r: &mut RanimScene) {
         });
         content.push(seq![
             wrapped.show(),
-            wrapped.rotating(PI * 2.0, DVec3::Z).with_rate_func(smooth),
+            wrapped
+                .anim_mut(Rotate::new(PI * 2.0, DVec3::Z))
+                .with_rate_func(smooth),
         ]);
     }
 

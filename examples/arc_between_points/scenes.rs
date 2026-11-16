@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::fading::FadeIn,
     color,
     color::HueDirection,
     glam::{DMat2, dvec2},
@@ -47,7 +47,7 @@ fn arc_between_points(r: &mut RanimScene) {
     let total_secs = 3.0;
     let content = arcs
         .iter_mut()
-        .map(|arc| arc.fade_in().with_rate_func(smooth))
+        .map(|arc| arc.anim_mut(FadeIn).with_rate_func(smooth))
         .into_lagged(0.2)
         .with_duration(total_secs);
 

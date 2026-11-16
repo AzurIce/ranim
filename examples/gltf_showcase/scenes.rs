@@ -1,7 +1,7 @@
 use std::f64::consts::{PI, TAU};
 
 use ranim::{
-    anims::camera::CameraFrameAnim,
+    anims::camera::Orbit,
     color::palettes::manim,
     core::transformed::{Transformed, TransformedExt},
     glam::{DAffine3, DVec3},
@@ -66,7 +66,7 @@ fn gltf_showcase(r: &mut RanimScene) {
     let mut cam = CameraFrame::from_spherical(65.0 * PI / 180.0, 25.0 * PI / 180.0, 9.5);
     cam.fovy = 40.0 * PI / 180.0;
     r.play(
-        cam.orbit(DVec3::ZERO, PI / 5.0)
+        cam.anim_mut(Orbit::new(DVec3::ZERO, PI / 5.0))
             .with_duration(total_secs)
             .with_rate_func(linear),
     );

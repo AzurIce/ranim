@@ -7,7 +7,7 @@ use ranim::{
     prelude::*,
     utils::rate_functions::{linear, smooth},
 };
-use ranim_anims::fading::FadingAnim;
+use ranim_anims::fading::FadeIn;
 use ranim_items::vitem::{VItem, text::TextItem};
 
 const INTRO_SECS: f64 = 2.0;
@@ -37,6 +37,7 @@ impl OrbitItem for Vec<VItem> {
 }
 
 /// A reusable orbital evaluator whose output keeps its concrete item type.
+#[derive(Clone)]
 struct OrbitMotion<T> {
     src: T,
     orbit_radius: f64,
@@ -145,6 +146,7 @@ fn body_layer(mut surface: Transformed<Surface, Translation>, planet: &PlanetDat
     seq![
         surface.show().with_duration(INTRO_SECS),
         orbit(&mut surface, planet, 0.0)
+            .into_animation()
             .with_duration(ORBIT_SECS)
             .with_rate_func(linear),
     ]
@@ -165,12 +167,13 @@ fn planet_label(planet: &PlanetData, position: DVec3) -> AnimSequence {
         .forward(LABEL_DELAY_SECS)
         .push(
             label
-                .fade_in()
+                .anim_mut(FadeIn)
                 .with_duration(LABEL_FADE_SECS)
                 .with_rate_func(smooth),
         )
         .push(
             orbit(&mut label, planet, label_z)
+                .into_animation()
                 .with_duration(ORBIT_SECS)
                 .with_rate_func(linear),
         );
@@ -241,7 +244,11 @@ fn orbit_ring(planet: &PlanetData) -> AnimSequence {
     let color = manim::GREY_C.with_alpha(0.3);
     ring.vertex_colors = vec![color; ring.vertices.len()];
 
-    let mut sequence = seq![ring.fade_in().with_duration(1.0).with_rate_func(smooth),];
+    let mut sequence = seq![
+        ring.anim_mut(FadeIn)
+            .with_duration(1.0)
+            .with_rate_func(smooth),
+    ];
     sequence.hold_to(TOTAL_SECS);
     sequence
 }

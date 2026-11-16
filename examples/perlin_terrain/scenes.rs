@@ -1,8 +1,8 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::camera::CameraFrameAnim, color::palettes::manim, glam::DVec3, items::mesh::Surface,
-    prelude::*, utils::rate_functions::linear,
+    anims::camera::Orbit, color::palettes::manim, glam::DVec3, items::mesh::Surface, prelude::*,
+    utils::rate_functions::linear,
 };
 
 // --- Improved Perlin Noise (ported from Python) ---
@@ -202,7 +202,7 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
     .with_fill_by_z(&colorscale);
 
     let camera = cam
-        .orbit(DVec3::ZERO, 2.0)
+        .anim_mut(Orbit::new(DVec3::ZERO, 2.0))
         .with_duration(5.0)
         .with_rate_func(linear);
     r.play(camera);

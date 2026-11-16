@@ -2,7 +2,7 @@
 
 use ranim_core::{
     SceneEvaluator,
-    animation::node::AnimationInfo,
+    animation::def_node::AnimDefNode,
     color::{self, LinearSrgb},
     frame::EvaluatedFrame,
 };
@@ -97,8 +97,8 @@ impl CanvasRenderer {
         self.evaluator.total_secs()
     }
 
-    pub fn animation_infos(&self) -> Vec<AnimationInfo> {
-        self.evaluator.animation_infos()
+    pub fn definitions(&self) -> &[AnimDefNode] {
+        self.evaluator.definition().definitions()
     }
 
     pub fn audio(&self) -> &[f32] {

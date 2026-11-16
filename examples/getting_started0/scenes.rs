@@ -1,5 +1,8 @@
 use ranim::{
-    anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
+    anims::fading::{FadeIn, FadeOut},
+    color::palettes::manim,
+    items::vitem::geometry::Square,
+    prelude::*,
     utils::rate_functions::smooth,
 };
 
@@ -13,14 +16,14 @@ fn getting_started0(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
+    let mut content = seq![square.anim_ref(FadeIn).with_rate_func(smooth)];
     content
         .hold(1.0)
         .push(square.hide())
         .forward(1.0)
         .push(square.show())
         .hold(1.0)
-        .push(square.clone().fade_out().with_rate_func(smooth));
+        .push(square.anim(FadeOut).with_rate_func(smooth));
 
     r.play(
         CameraFrame::default()

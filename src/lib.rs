@@ -92,6 +92,8 @@ pub use app::{
 };
 pub use bevy_app::{App, Plugin};
 pub use bevy_ecs::prelude::Resource;
+pub use core::animation::def_node::{AnimDef, AnimDefNode, AnimDefNodeContent, ItemAnimExt};
+pub use core::animation::{AnimRecipe, AnimWriteBack};
 
 pub use core::glam;
 pub use ranim_core::{RanimScene, lagged, seq, stack};

@@ -24,7 +24,7 @@
 //!   changes over time on identical scene state (temporal instability).
 
 use ranim::{
-    anims::camera::CameraFrameAnim,
+    anims::camera::Orbit,
     color::{AlphaColor, Srgb, palettes::manim},
     glam::{DVec3, dvec3},
     items::vitem::geometry::{Circle, Square},
@@ -244,7 +244,7 @@ fn flicker(r: &mut RanimScene) {
     let mut cam = CameraFrame::from_spherical(60f64.to_radians(), 20f64.to_radians(), 8.0);
     cam.fovy = 50f64.to_radians();
     r.play(
-        cam.orbit(DVec3::ZERO, 0.4)
+        cam.anim_mut(Orbit::new(DVec3::ZERO, 0.4))
             .with_duration(total)
             .with_rate_func(linear),
     );

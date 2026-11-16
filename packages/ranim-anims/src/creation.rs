@@ -1,82 +1,85 @@
+//! Creation and writing operation parameters.
+
 use ranim_core::{
-    animation::eval::{Eval, EvalExt},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
 };
 use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
-use tracing::warn;
 
-// MARK: Creation
-
-/// The requirement of [`Create`] and [`UnCreate`]
+/// Item capabilities needed for progressive creation.
 pub trait CreationRequirement: Clone + Partial + Empty + Interpolatable {}
 impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 
-/// The methods to create animations for `T` that satisfies [`CreationRequirement`]
-pub trait CreationAnim<T: CreationRequirement + 'static> {
-    /// Create a [`Create`] anim for `T`.
-    fn create(&mut self) -> Create<T>;
-    /// Create an [`UnCreate`] anim for `T`.
-    fn uncreate(&mut self) -> UnCreate<T>;
-}
-
-impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(&mut self) -> Create<T> {
-        Create::new(self.clone()).apply_to(self)
-    }
-    fn uncreate(&mut self) -> UnCreate<T> {
-        UnCreate::new(self.clone()).apply_to(self)
-    }
-}
-
-// MARK: Writing
-/// The requirement of [`Write`] and [`Unwrite`]
+/// Item capabilities needed for outline-then-fill writing.
 pub trait WritingRequirement: CreationRequirement + StrokeWidth + StrokeColor + FillColor {}
 impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequirement for T {}
 
-/// The methods to create animations for `T` that satisfies [`WritingRequirement`]
-pub trait WritingAnim: WritingRequirement + Sized + 'static {
-    /// Create a [`Write`] anim for `T`.
-    fn write(&mut self) -> Write<Self>;
-    /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(&mut self) -> Unwrite<Self>;
+/// Reveal an item progressively.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Create;
+/// Remove an item progressively.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct UnCreate;
+/// Draw the outline, then restore the original fill.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Write;
+/// Remove the fill, then erase the outline.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Unwrite;
+
+/// Prepared progressive creation or removal.
+pub struct CreateEval<T> {
+    original: T,
+    reverse: bool,
 }
 
-impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
-    fn write(&mut self) -> Write<Self> {
-        Write::new(self.clone()).apply_to(self)
-    }
-    fn unwrite(&mut self) -> Unwrite<Self> {
-        Unwrite::new(self.clone()).apply_to(self)
-    }
-}
-
-// ---------------------------------------------------- //
-
-// MARK: Impl
-/// The create anim.
-///
-/// This anim uses [`Partial::get_partial_closed`] to create the item
-pub struct Create<T: CreationRequirement> {
-    /// The original object
-    pub original: T,
-}
-
-impl<T: CreationRequirement> Create<T> {
-    /// Constructor
-    pub fn new(target: T) -> Self {
-        Self { original: target }
+impl<T: CreationRequirement + Send + Sync + 'static> AnimRecipe<T> for Create {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(
+            CreateEval {
+                original: input.clone(),
+                reverse: false,
+            },
+            1.0,
+        )
     }
 }
-
-impl<T: CreationRequirement> Eval for Create<T> {
+impl<T: CreationRequirement + Send + Sync + 'static> AnimWriteBack<T> for Create {
+    fn end_value(&self, input: &T) -> T {
+        input.clone()
+    }
+}
+impl<T: CreationRequirement + Send + Sync + 'static> AnimRecipe<T> for UnCreate {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(
+            CreateEval {
+                original: input.clone(),
+                reverse: true,
+            },
+            1.0,
+        )
+    }
+}
+impl<T: CreationRequirement + Send + Sync + 'static> AnimWriteBack<T> for UnCreate {
+    fn end_value(&self, _input: &T) -> T {
+        T::empty()
+    }
+}
+impl<T: CreationRequirement> Eval for CreateEval<T> {
     type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        if alpha == 0.0 {
+    fn eval_alpha(&self, alpha: f64) -> T {
+        let alpha = if self.reverse && !(0.0..=1.0).contains(&alpha) {
+            tracing::warn!("the alpha is out of range: {alpha}, clamped to 0.0..=1.0");
+            alpha.clamp(0.0, 1.0)
+        } else {
+            alpha
+        };
+        let progress = if self.reverse { 1.0 - alpha } else { alpha };
+        if progress == 0.0 {
             T::empty()
-        } else if 0.0 < alpha && alpha < 1.0 {
-            self.original.get_partial_closed(0.0..alpha)
-        } else if alpha == 1.0 {
+        } else if (0.0..1.0).contains(&progress) {
+            self.original.get_partial_closed(0.0..progress)
+        } else if progress == 1.0 {
             self.original.clone()
         } else {
             unreachable!()
@@ -84,124 +87,76 @@ impl<T: CreationRequirement> Eval for Create<T> {
     }
 }
 
-/// The uncreate anim
-///
-/// This anim uses [`Partial::get_partial_closed`] to uncreate the item
-pub struct UnCreate<T: CreationRequirement> {
-    /// The original object
-    pub original: T,
+/// Prepared writing geometry, including the derived outline.
+pub struct WriteEval<T> {
+    original: T,
+    outline: T,
+    reverse: bool,
 }
 
-impl<T: CreationRequirement> UnCreate<T> {
-    /// Constructor
-    pub fn new(target: T) -> Self {
-        Self { original: target }
+fn prepare_write<T: WritingRequirement>(input: &T, reverse: bool) -> WriteEval<T> {
+    let mut outline = input.clone();
+    outline.set_fill_opacity(0.0).set_stroke_opacity(1.0);
+    if outline.stroke_width() == 0.0 {
+        outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
+    }
+    WriteEval {
+        original: input.clone(),
+        outline,
+        reverse,
     }
 }
 
-impl<T: CreationRequirement> Eval for UnCreate<T> {
+impl<T: WritingRequirement + Send + Sync + 'static> AnimRecipe<T> for Write {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(prepare_write(input, false), 1.0)
+    }
+}
+impl<T: WritingRequirement + Send + Sync + 'static> AnimWriteBack<T> for Write {
+    fn end_value(&self, input: &T) -> T {
+        input.clone()
+    }
+}
+impl<T: WritingRequirement + Send + Sync + 'static> AnimRecipe<T> for Unwrite {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(prepare_write(input, true), 1.0)
+    }
+}
+impl<T: WritingRequirement + Send + Sync + 'static> AnimWriteBack<T> for Unwrite {
+    fn end_value(&self, _input: &T) -> T {
+        T::empty()
+    }
+}
+
+impl<T: WritingRequirement> Eval for WriteEval<T> {
     type Output = T;
-
-    fn eval_alpha(&self, mut alpha: f64) -> Self::Output {
-        if !(0.0..=1.0).contains(&alpha) {
-            warn!("the alpha is out of range: {alpha}, clampped to 0.0..=1.0");
-            alpha = alpha.clamp(0.0, 1.0)
-        }
-        // trace!("{alpha}");
-        if alpha == 0.0 {
-            self.original.clone()
-        } else if 0.0 < alpha && alpha < 1.0 {
-            self.original.get_partial_closed(0.0..1.0 - alpha)
-        } else if alpha == 1.0 {
-            T::empty()
+    fn eval_alpha(&self, alpha: f64) -> T {
+        if self.reverse {
+            let alpha = alpha * 2.0;
+            if (0.0..1.0).contains(&alpha) {
+                self.original.lerp(&self.outline, alpha)
+            } else if alpha == 1.0 {
+                self.outline.clone()
+            } else if (1.0..2.0).contains(&alpha) {
+                self.outline.get_partial(0.0..2.0 - alpha)
+            } else if alpha == 2.0 {
+                T::empty()
+            } else {
+                unreachable!()
+            }
         } else {
-            panic!("the alpha is out of range: {alpha}");
-        }
-    }
-}
-
-/// Write
-///
-/// First update with partial from 0.0..0.0 to 0.0..1.0, then lerp fill_opacity to 1.0
-pub struct Write<T: WritingRequirement> {
-    pub(crate) original: T,
-    pub(crate) outline: T,
-}
-
-impl<T: WritingRequirement> Write<T> {
-    /// Constructor
-    pub fn new(target: T) -> Self {
-        let mut outline = target.clone();
-        outline.set_fill_opacity(0.0).set_stroke_opacity(1.0);
-        if outline.stroke_width() == 0.0 {
-            outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
-        }
-        Self {
-            original: target,
-            outline,
-        }
-    }
-}
-
-impl<T: WritingRequirement> Eval for Write<T> {
-    type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        let alpha = alpha * 2.0;
-        if (0.0..1.0).contains(&alpha) {
-            self.outline.get_partial(0.0..alpha)
-        } else if alpha == 1.0 {
-            self.outline.clone()
-        } else if (1.0..2.0).contains(&alpha) {
-            self.outline.lerp(&self.original, alpha - 1.0)
-        } else if alpha == 2.0 {
-            self.original.clone()
-        } else {
-            unreachable!()
-        }
-    }
-}
-
-/// Unwrite
-///
-/// First lerp fill_opacity to 0.0, then update with partial from 0.0..1.0 to 0.0..0.0
-pub struct Unwrite<T: WritingRequirement> {
-    pub(crate) original: T,
-    pub(crate) outline: T,
-}
-
-impl<T: WritingRequirement> Unwrite<T> {
-    /// Constructor
-    pub fn new(target: T) -> Self {
-        let mut outline = target.clone();
-        outline.set_fill_opacity(0.0).set_stroke_opacity(1.0);
-        if outline.stroke_width() == 0.0 {
-            outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
-        }
-        Self {
-            original: target,
-            outline,
-        }
-    }
-}
-
-impl<T: WritingRequirement> Eval for Unwrite<T> {
-    type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        let alpha = alpha * 2.0;
-        if (0.0..1.0).contains(&alpha) {
-            self.original.lerp(&self.outline, alpha)
-        } else if alpha == 1.0 {
-            self.outline.clone()
-        } else if (1.0..2.0).contains(&alpha) {
-            self.outline.get_partial(0.0..2.0 - alpha)
-        } else if alpha == 2.0 {
-            T::empty()
-        } else if alpha == 0.0 {
-            self.original.clone()
-        } else {
-            panic!("the alpha is out of range: {alpha}");
+            let alpha = alpha * 2.0;
+            if (0.0..1.0).contains(&alpha) {
+                self.outline.get_partial(0.0..alpha)
+            } else if alpha == 1.0 {
+                self.outline.clone()
+            } else if (1.0..2.0).contains(&alpha) {
+                self.outline.lerp(&self.original, alpha - 1.0)
+            } else if alpha == 2.0 {
+                self.original.clone()
+            } else {
+                unreachable!()
+            }
         }
     }
 }

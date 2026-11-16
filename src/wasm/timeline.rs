@@ -1,35 +1,41 @@
-//! Transfer the core animation metadata without renderer or UI handles.
+//! Serialize retained definitions at the browser boundary.
 
 use js_sys::{Array, Object, Reflect};
-use ranim_core::animation::node::{AnimationInfo, AnimationInfoKind};
+use ranim_core::animation::def_node::AnimDefNode;
 use wasm_bindgen::JsValue;
 
-pub(super) fn snapshot(duration: f64, roots: Vec<AnimationInfo>) -> Result<JsValue, JsValue> {
+pub(super) fn snapshot(duration: f64, roots: &[AnimDefNode]) -> Result<JsValue, JsValue> {
     object(&[("duration", duration.into()), ("roots", nodes(roots)?)])
 }
 
-fn nodes(infos: Vec<AnimationInfo>) -> Result<JsValue, JsValue> {
+fn nodes(definitions: &[AnimDefNode]) -> Result<JsValue, JsValue> {
     let result = Array::new();
-    for info in infos {
-        let kind = match info.kind {
-            AnimationInfoKind::Anim => "anim",
-            AnimationInfoKind::Children => "children",
-            AnimationInfoKind::Audio => "audio",
+    for definition in definitions {
+        let kind = if definition.is_container() {
+            "children"
+        } else if definition.is_audio() {
+            "audio"
+        } else {
+            "anim"
         };
+        let range = definition.time_range();
         result.push(&object(&[
-            ("name", info.anim_name.into()),
+            ("name", definition.anim_name().into()),
             ("kind", kind.into()),
             (
                 "range",
-                Array::of2(&info.range.start.into(), &info.range.end.into()).into(),
+                Array::of2(&range.start.into(), &range.end.into()).into(),
             ),
-            ("contentDuration", info.content_duration_secs.into()),
-            ("enabled", info.enabled.into()),
+            ("contentDuration", definition.content_duration_secs().into()),
+            ("enabled", definition.enabled().into()),
             (
                 "simStep",
-                info.sim_step.map(JsValue::from).unwrap_or(JsValue::NULL),
+                definition
+                    .sim_step()
+                    .map(JsValue::from)
+                    .unwrap_or(JsValue::NULL),
             ),
-            ("children", nodes(info.children)?),
+            ("children", nodes(definition.definitions())?),
         ])?);
     }
     Ok(result.into())

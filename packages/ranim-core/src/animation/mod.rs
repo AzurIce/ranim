@@ -6,21 +6,24 @@
 //!
 //! - [`node`] — the closed runtime core and all structural interpreters;
 //! - [`eval`] — the open, typed visual-leaf protocol;
-//! - [`build`] — the lowering protocol from authoring definitions to
-//!   [`AnimNode`](crate::animation::node::AnimNode);
+//! - [`build`] — definition-layer playback configuration and placement;
+//! - [`def_node`] — retained definitions and their compilation to [`AnimNode`];
 //! - [`compose`] — authoring sugar (`AnimSequence`, `AnimStack`, `AnimLagged`)
 //!   that lowers to the core vocabulary.
 //!
-//! Authoring is open above the core: user leaves enter through
-//! [`Eval`](crate::animation::eval::Eval), and combinators expressible as
+//! Authoring is open above the core: recipes build runtime nodes, visual leaves
+//! implement [`Eval`](crate::animation::eval::Eval), and combinators expressible as
 //! placements (e.g. [`AnimLagged`](crate::animation::compose::lagged::AnimLagged))
-//! desugar into the primitives in
-//! [`IntoAnimNode`](crate::animation::build::IntoAnimNode).
+//! construct [`AnimDefNode`](crate::animation::def_node::AnimDefNode) trees.
+
+use crate::animation::node::AnimNode;
 
 /// Authoring protocol and playback wrappers.
 pub mod build;
 /// Built-in composition containers and iterator helpers.
 pub mod compose;
+/// Retained animation definition nodes and input/recipe type erasure.
+pub mod def_node;
 /// Evaluation protocols and author-facing adapters.
 pub mod eval;
 /// Runtime animation nodes and their interpreters.
@@ -28,13 +31,32 @@ pub mod node;
 /// Audio leaf animation: a sound placed and composed like any animation.
 pub mod sound;
 
+/// A recipe that constructs a runtime animation node from an input snapshot.
+///
+/// Recipes determine their node's default timing and may produce visual, audio,
+/// or composite content. Neither the input nor the recipe is consumed by build.
+pub trait AnimRecipe<T> {
+    /// Construct an independent execution instance from this definition.
+    fn build(&self, input: &T) -> AnimNode;
+}
+
+/// A recipe that explicitly supports writing its terminal state back to its input.
+///
+/// This capability is independent of runtime output types: only recipes that
+/// implement it may be passed to [`ItemAnimExt::anim_mut`](def_node::ItemAnimExt::anim_mut).
+pub trait AnimWriteBack<T>: AnimRecipe<T> {
+    /// Compute the terminal input state, independent of outer playback overrides.
+    fn end_value(&self, input: &T) -> T;
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        build::{IntoAnimNode, PlaybackExt, Unplaced},
+        build::{PlaybackExt, Unplaced},
         compose::{AnimIterExt, lagged::LaggedFill, sequence::AnimSequence, stack::AnimStack},
+        def_node::AnimDefNode,
         eval::{DynOutput, Eval, EvalExt, OutputContext, Static, StaticAnim, pure::Pure},
-        node::{AnimNode, AnimationInfoKind, LeafContent, NodeContent},
+        node::{AnimNode, LeafContent, NodeContent},
     };
     use crate::{frame::EvaluatedFrame, lagged, seq, stack};
 
@@ -42,6 +64,7 @@ mod tests {
     struct PositionX(f32);
 
     /// A stateless test double: a position fixed at x.
+    #[derive(Clone)]
     struct ShiftX(f32);
 
     impl Eval for ShiftX {
@@ -53,6 +76,7 @@ mod tests {
     }
 
     /// A stateless test double: x = offset + alpha.
+    #[derive(Clone)]
     struct ShiftAlpha(f32);
 
     impl Eval for ShiftAlpha {
@@ -64,11 +88,15 @@ mod tests {
     }
 
     fn leaf(x: f32, duration: f64) -> impl Unplaced {
-        ShiftX(x).with_duration(duration)
+        ShiftX(x).into_animation().with_duration(duration)
     }
 
     fn progress_leaf(offset: f32) -> impl Unplaced {
-        ShiftAlpha(offset)
+        ShiftAlpha(offset).into_animation()
+    }
+
+    fn runtime(definition: impl Into<AnimDefNode>) -> AnimNode {
+        definition.into().build()
     }
 
     fn evaluated_xs(items: Vec<DynOutput>) -> Vec<f32> {
@@ -115,13 +143,14 @@ mod tests {
             .into_iter()
             .into_lagged(0.5);
         for (node, second_range) in [
-            (sequence.into_anim_node(), 1.0..3.0),
-            (stack.into_anim_node(), 0.0..2.0),
+            (runtime(sequence), 1.0..3.0),
+            (runtime(stack), 0.0..2.0),
             (
-                lagged
-                    .with_leading(LaggedFill::Empty)
-                    .with_trailing(LaggedFill::Empty)
-                    .into_anim_node(),
+                runtime(
+                    lagged
+                        .with_leading(LaggedFill::Empty)
+                        .with_trailing(LaggedFill::Empty),
+                ),
                 0.5..1.5,
             ),
         ] {
@@ -131,24 +160,23 @@ mod tests {
             let range = child.children().first().unwrap_or(child).time_range();
             assert_eq!(range, second_range);
         }
-        assert!(seq![].into_anim_node().children().is_empty());
-        assert!(stack![].into_anim_node().children().is_empty());
+        assert!(runtime(seq![]).children().is_empty());
+        assert!(runtime(stack![]).children().is_empty());
     }
 
     #[test]
     fn runtime_children_evaluate_overlaps_in_order_and_keep_half_open_boundaries() {
-        let animation = stack![
+        let animation = runtime(stack![
             progress_leaf(0.0).with_duration(2.0),
             progress_leaf(10.0).with_duration(2.0).at(1.0),
             leaf(100.0, 3.0).with_enabled(false),
-        ]
-        .into_anim_node();
+        ]);
         assert!(matches!(animation.content, NodeContent::Children(_)));
         assert_eq!(sampled_xs(&animation, 1.5), vec![0.75, 10.25]);
         assert_eq!(sampled_xs(&animation, 2.0), vec![10.5]);
         assert_eq!(sampled_xs(&animation, 3.0), vec![11.0]);
         assert_eq!(sampled_xs(&animation, 3.1), vec![]);
-        let sequential = seq![leaf(1.0, 1.0), leaf(2.0, 1.0)].into_anim_node();
+        let sequential = runtime(seq![leaf(1.0, 1.0), leaf(2.0, 1.0)]);
         assert!(matches!(sequential.content, NodeContent::Children(_)));
         assert_eq!(sampled_xs(&sequential, 1.0), vec![2.0]);
     }
@@ -160,10 +188,10 @@ mod tests {
             .push(leaf(1.0, 2.0))
             .forward(1.0)
             .push(leaf(2.0, 1.0));
-        let info = sequence.at(10.0).into_anim_node().animation_info();
-        assert_eq!(info.range, 10.0..14.0);
-        assert_eq!(info.children[0].range, 0.0..2.0);
-        assert_eq!(info.children[1].range, 3.0..4.0);
+        let node = runtime(sequence.at(10.0));
+        assert_eq!(node.time_range(), 10.0..14.0);
+        assert_eq!(node.children()[0].time_range(), 0.0..2.0);
+        assert_eq!(node.children()[1].time_range(), 3.0..4.0);
     }
 
     #[test]
@@ -173,16 +201,14 @@ mod tests {
         let animation = seq![progress_leaf(0.0), progress_leaf(10.0)]
             .with_duration(4.0)
             .with_rate_func(ease_in_quad);
-        let animation = animation.into_anim_node();
+        let animation = runtime(animation);
 
         assert_eq!(animation.time_range(), 0.0..4.0);
         assert_eq!(sampled_xs(&animation, 2.0), vec![0.5]);
-        let info = animation.animation_info();
-        assert_eq!(info.range, 0.0..4.0);
-        assert_eq!(info.content_duration_secs, 2.0);
-        assert_eq!(info.children.len(), 2);
-        assert_eq!(info.children[0].range, 0.0..1.0);
-        assert_eq!(info.children[1].range, 1.0..2.0);
+        assert_eq!(animation.internal_time_secs, 2.0);
+        assert_eq!(animation.children().len(), 2);
+        assert_eq!(animation.children()[0].time_range(), 0.0..1.0);
+        assert_eq!(animation.children()[1].time_range(), 1.0..2.0);
     }
 
     #[test]
@@ -191,23 +217,33 @@ mod tests {
         source
             .push(leaf(2.0, 1.0))
             .forward(2.0)
-            .push(leaf(3.0, 1.0));
+            .push(leaf(3.0, 1.0))
+            .hold(1.0);
 
         let mut sequence = AnimSequence::new();
         sequence.push(leaf(1.0, 2.0)).extend(source);
-        assert_eq!(sequence.cursor_sec(), 6.0);
-        assert_eq!(sequence.built_animations().len(), 3);
-        assert_eq!(sequence.built_animations()[0].time_range(), 0.0..2.0);
-        assert_eq!(sequence.built_animations()[1].time_range(), 2.0..3.0);
-        assert_eq!(sequence.built_animations()[2].time_range(), 5.0..6.0);
+        assert_eq!(sequence.cursor_sec(), 7.0);
+        assert_eq!(sequence.definitions().len(), 4);
+        assert_eq!(sequence.definitions()[0].time_range(), 0.0..2.0);
+        assert_eq!(sequence.definitions()[1].time_range(), 2.0..3.0);
+        assert_eq!(sequence.definitions()[2].time_range(), 5.0..6.0);
+        assert_eq!(sampled_xs(&runtime(sequence), 6.5), vec![3.0]);
 
         let source = stack![leaf(2.0, 1.0), leaf(3.0, 2.0).at(1.0)];
         let mut stack = stack![leaf(1.0, 4.0)];
         stack.extend(source);
         assert_eq!(stack.duration_secs(), 4.0);
-        assert_eq!(stack.built_animations().len(), 3);
-        assert_eq!(stack.built_animations()[1].time_range(), 0.0..1.0);
-        assert_eq!(stack.built_animations()[2].time_range(), 1.0..3.0);
+        assert_eq!(stack.definitions().len(), 3);
+        assert_eq!(stack.definitions()[1].time_range(), 0.0..1.0);
+        assert_eq!(stack.definitions()[2].time_range(), 1.0..3.0);
+
+        // A leading hold authored in isolation must not capture the destination
+        // sequence's state after extend flattens the two sets of children.
+        let mut empty = AnimSequence::new();
+        empty.hold(1.0);
+        let mut extended = seq![leaf(5.0, 1.0)];
+        extended.extend(empty);
+        assert!(sampled_xs(&runtime(extended), 1.5).is_empty());
     }
 
     #[test]
@@ -218,8 +254,9 @@ mod tests {
             .hold(1.0)
             .hold(2.0);
         assert_eq!(sequence.cursor_sec(), 5.0);
+        let built = runtime(sequence);
         for (index, sec) in [(1, 2.5), (2, 4.0)] {
-            let held = &sequence.built_animations()[index];
+            let held = &built.children()[index];
             let mut items = Vec::new();
             held.capture_at(sec, &mut items);
             // Finished children disappear; consecutive holds keep a flat batch.
@@ -238,11 +275,11 @@ mod tests {
         for (ending, expected) in [(shown.show(), vec![7.0]), (shown.hide(), vec![])] {
             let mut outer = AnimSequence::new();
             outer.push(seq![leaf(1.0, 1.0), ending]).hold(1.0);
-            assert_eq!(sampled_xs(&outer.into_anim_node(), 1.5), expected);
+            assert_eq!(sampled_xs(&runtime(outer), 1.5), expected);
         }
         let mut gap = AnimSequence::new();
         gap.push(leaf(4.0, 1.0)).forward(1.0).hold(1.0);
-        assert!(sampled_xs(&gap.into_anim_node(), 2.5).is_empty());
+        assert!(sampled_xs(&runtime(gap), 2.5).is_empty());
     }
 
     #[test]
@@ -257,7 +294,7 @@ mod tests {
             .hold(0.5)
             .push(second.hide())
             .hold(0.5);
-        let animation = sequence.into_anim_node();
+        let animation = runtime(sequence);
         assert_eq!(animation.children().len(), 2);
         assert_eq!(sampled_xs(&animation, 0.5), vec![0.5]);
         assert_eq!(sampled_xs(&animation, 1.0), vec![3.0]);
@@ -269,24 +306,25 @@ mod tests {
     #[test]
     fn sequence_final_points_replace_endpoints_without_affecting_stacks() {
         let shown = PositionX(9.0);
-        let sequence = seq![progress_leaf(0.0), shown.show(), shown.hide(), shown.show()]
-            .with_duration(2.0)
-            .at(3.0)
-            .into_anim_node();
+        let sequence = runtime(
+            seq![progress_leaf(0.0), shown.show(), shown.hide(), shown.show()]
+                .with_duration(2.0)
+                .at(3.0),
+        );
         assert_eq!(sampled_xs(&sequence, 4.0), vec![0.5]);
         assert_eq!(sampled_xs(&sequence, 5.0), vec![9.0]);
         assert_eq!(sequence.children().len(), 2);
         assert!(!sequence.children()[0].active_at(1.0));
 
-        let hidden = seq![progress_leaf(0.0), shown.hide()].into_anim_node();
+        let hidden = runtime(seq![progress_leaf(0.0), shown.hide()]);
         assert_eq!(sampled_xs(&hidden, 0.5), vec![0.5]);
         assert!(sampled_xs(&hidden, 1.0).is_empty());
-        let only_points = seq![shown.show(), shown.hide()].into_anim_node();
+        let only_points = runtime(seq![shown.show(), shown.hide()]);
         assert_eq!(only_points.children().len(), 1);
         assert!(sampled_xs(&only_points, 0.0).is_empty());
 
         // Stacks retain all coincident endpoints, including point animations.
-        let stack = stack![progress_leaf(0.0), shown.show().at(1.0)].into_anim_node();
+        let stack = runtime(stack![progress_leaf(0.0), shown.show().at(1.0)]);
         assert_eq!(sampled_xs(&stack, 1.0), vec![1.0, 9.0]);
     }
 
@@ -294,35 +332,33 @@ mod tests {
     fn lagged_staggers_and_fills_window_edges() {
         // Stagger by a ratio of each previous child's duration.
         let lagged = lagged![0.5; leaf(1.0, 1.0), leaf(2.0, 2.0), leaf(3.0, 1.0)];
-        assert_eq!(lagged.built_animations()[0].time_range(), 0.0..1.0);
-        assert_eq!(lagged.built_animations()[1].time_range(), 0.5..2.5);
-        assert_eq!(lagged.built_animations()[2].time_range(), 1.5..2.5);
+        assert_eq!(lagged.definitions()[0].time_range(), 0.0..1.0);
+        assert_eq!(lagged.definitions()[1].time_range(), 0.5..2.5);
+        assert_eq!(lagged.definitions()[2].time_range(), 1.5..2.5);
         assert_eq!(lagged.duration_secs(), 2.5);
 
         // ratio 1.0 is a sequence, ratio 0.0 is a stack.
         let as_sequence = lagged![1.0; leaf(1.0, 1.0), leaf(2.0, 1.0)];
-        assert_eq!(as_sequence.built_animations()[1].time_range(), 1.0..2.0);
+        assert_eq!(as_sequence.definitions()[1].time_range(), 1.0..2.0);
         let as_stack = lagged![0.0; leaf(1.0, 1.0), leaf(2.0, 2.0)];
-        assert_eq!(as_stack.built_animations()[1].time_range(), 0.0..2.0);
+        assert_eq!(as_stack.definitions()[1].time_range(), 0.0..2.0);
         assert_eq!(as_stack.duration_secs(), 2.0);
 
         // Default leading/trailing fills hold the edge states.
-        let animation = lagged![
+        let animation = runtime(lagged![
             0.5;
             progress_leaf(0.0).with_duration(1.0),
             progress_leaf(10.0).with_duration(1.0)
-        ]
-        .into_anim_node();
-        let info = animation.animation_info();
-        assert_eq!(info.kind, AnimationInfoKind::Children);
-        let track_ranges: Vec<_> = info
-            .children
+        ]);
+        assert!(matches!(animation.content, NodeContent::Children(_)));
+        let track_ranges: Vec<_> = animation
+            .children()
             .iter()
             .map(|track| {
                 track
-                    .children
+                    .children()
                     .iter()
-                    .map(|child| child.range.clone())
+                    .map(AnimNode::time_range)
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -335,19 +371,20 @@ mod tests {
         assert_eq!(sampled_xs(&animation, 1.5), vec![1.0, 11.0]);
 
         // `with_leading(Empty)` leaves the pre-window empty, trailing holds.
-        let empty_leading = lagged![
-            0.5;
-            progress_leaf(0.0).with_duration(1.0),
-            progress_leaf(10.0).with_duration(1.0)
-        ]
-        .with_leading(LaggedFill::Empty)
-        .into_anim_node();
+        let empty_leading = runtime(
+            lagged![
+                0.5;
+                progress_leaf(0.0).with_duration(1.0),
+                progress_leaf(10.0).with_duration(1.0)
+            ]
+            .with_leading(LaggedFill::Empty),
+        );
         assert_eq!(sampled_xs(&empty_leading, 0.25), vec![0.25]);
         assert_eq!(sampled_xs(&empty_leading, 1.0), vec![1.0, 10.5]);
 
         // A child ending with `hide` stays hidden after its own window.
         let shown = PositionX(2.0);
-        let hidden = lagged![0.5; seq![leaf(2.0, 1.0), shown.hide()]].into_anim_node();
+        let hidden = runtime(lagged![0.5; seq![leaf(2.0, 1.0), shown.hide()]]);
         assert_eq!(sampled_xs(&hidden, 0.5), vec![2.0]);
         assert!(sampled_xs(&hidden, 1.0).is_empty());
     }
@@ -512,10 +549,10 @@ mod tests {
         // detected by comparison. Future mixing fast paths compose affine
         // maps only while every rate along the path is linear.
         let cells = [
-            AnimSequence::new().into_anim_node(),
-            AnimStack::new().into_anim_node(),
-            Sound::new(tone(0.01)).into_anim_node(),
-            leaf(1.0, 1.0).into_anim_node(),
+            runtime(AnimSequence::new()),
+            runtime(AnimStack::new()),
+            runtime(Sound::new(tone(0.01))),
+            runtime(leaf(1.0, 1.0)),
         ];
         for cell in &cells {
             assert!(
@@ -523,7 +560,7 @@ mod tests {
                 "a default-built cell must carry the structural linear rate"
             );
         }
-        let warped = leaf(1.0, 1.0).with_rate_func(ease_in_quad).into_anim_node();
+        let warped = runtime(leaf(1.0, 1.0).with_rate_func(ease_in_quad));
         assert!(warped.rate_func.is_some());
     }
 

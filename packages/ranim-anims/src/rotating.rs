@@ -1,71 +1,84 @@
+//! Rotation parameters, bound to an input through `ItemAnimExt`.
+
 use ranim_core::{
-    animation::eval::{Eval, EvalExt},
+    animation::{AnimRecipe, AnimWriteBack, eval::Eval, node::AnimNode},
     glam::DVec3,
     traits::{
-        Aabb, AabbPoint, Locate,
+        AabbPoint, Locate,
         transform::{RotateTransform, ShiftTransformExt},
     },
 };
 
-// MARK: Require Trait
-/// The requirement of [`RotatingAnimation`]
+/// Item capabilities needed for rotation around a located point.
 pub trait RotatingRequirement: RotateTransform + ShiftTransformExt + Clone {}
 impl<T: RotateTransform + ShiftTransformExt + Clone> RotatingRequirement for T {}
 
-// MARK: Anim Trait
-/// The methods to create rotation animations for `T` that satisfies [`RotatingRequirement`]
-pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
-    /// Rotate by a given angle about a given axis at center.
-    fn rotating(&mut self, angle: f64, axis: DVec3) -> RotatingAnimation<Self>
-    where
-        Self: Aabb,
-    {
-        self.rotating_at(angle, axis, AabbPoint::CENTER)
-    }
+/// Rotation inputs. The pivot is resolved against the original input at build time.
+#[derive(Clone)]
+pub struct Rotate<A = AabbPoint> {
+    /// Rotation angle, in radians.
+    pub angle: f64,
+    /// Rotation axis.
+    pub axis: DVec3,
+    /// Pivot locator, such as `AabbPoint::CENTER` or an explicit `DVec3`.
+    pub point: A,
+}
 
-    /// Rotate by a given angle about a given axis at the given anchor.
-    fn rotating_at<A: Locate<Self>>(
-        &mut self,
-        angle: f64,
-        axis: DVec3,
-        anchor: A,
-    ) -> RotatingAnimation<Self> {
-        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self)).apply_to(self)
+impl Rotate {
+    /// Rotate around the input's bounding-box center.
+    pub fn new(angle: f64, axis: DVec3) -> Self {
+        Self {
+            angle,
+            axis,
+            point: AabbPoint::CENTER,
+        }
     }
 }
 
-impl<T: RotatingRequirement + 'static> RotatingAnim for T {}
+impl<A> Rotate<A> {
+    /// Rotate around an explicit point or locator.
+    pub fn at(angle: f64, axis: DVec3, point: A) -> Self {
+        Self { angle, axis, point }
+    }
+}
 
-// MARK: Impl
-
-/// Rotation animation.
-///
-/// Unlike [`Morph`](crate::morph::Morph) which linearly interpolates between
-/// start and end states, this animation applies incremental rotation at each frame,
-/// producing a true circular arc motion.
-pub struct RotatingAnimation<T: RotatingRequirement> {
+/// Prepared rotation with a resolved pivot.
+pub struct RotateEval<T> {
     src: T,
     angle: f64,
     axis: DVec3,
     point: DVec3,
 }
 
-impl<T: RotatingRequirement> RotatingAnimation<T> {
-    /// Constructor
-    pub fn new(src: T, angle: f64, axis: DVec3, point: DVec3) -> Self {
-        Self {
-            src,
-            angle,
-            axis,
-            point,
+impl<A> Rotate<A> {
+    fn prepare<T: RotatingRequirement>(&self, input: &T) -> RotateEval<T>
+    where
+        A: Locate<T>,
+    {
+        RotateEval {
+            src: input.clone(),
+            angle: self.angle,
+            axis: self.axis,
+            point: self.point.locate(input),
         }
     }
 }
 
-impl<T: RotatingRequirement> Eval for RotatingAnimation<T> {
-    type Output = T;
+impl<T: RotatingRequirement + Send + Sync + 'static, A: Locate<T>> AnimRecipe<T> for Rotate<A> {
+    fn build(&self, input: &T) -> AnimNode {
+        AnimNode::from_eval(self.prepare(input), 1.0)
+    }
+}
 
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+impl<T: RotatingRequirement + Send + Sync + 'static, A: Locate<T>> AnimWriteBack<T> for Rotate<A> {
+    fn end_value(&self, input: &T) -> T {
+        self.prepare(input).eval_alpha(1.0)
+    }
+}
+
+impl<T: RotatingRequirement> Eval for RotateEval<T> {
+    type Output = T;
+    fn eval_alpha(&self, alpha: f64) -> T {
         let mut result = self.src.clone();
         result.with_origin(self.point, |x| {
             x.rotate_on_axis(self.axis, self.angle * alpha);

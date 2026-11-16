@@ -7,7 +7,8 @@
 渲染表示（见渲染表示大节）相比，它们用 f64（`DVec3` / `DAffine3`）描述、
 携带动画所需的辅助结构（如 `PointVec` 对齐包装），并实现了一批动画/变换
 trait（`Interpolatable`、`Alignable`、`FillColor`、`ShiftTransform` 等），可以
-直接配合 `morph`、`fade_in` 等动画使用。完整的动画输出原样保存在类型化帧中。
+通过 `anim` / `anim_ref` / `anim_mut` 配合 `Morph`、`FadeIn` 等操作参数使用。
+完整的动画输出原样保存在类型化帧中。
 启用 items 的 `render` feature 后，各物件实现值级 `Extract`；默认渲染配置
 已包含内置物件插件（`RanimItemsPlugin`），渲染裸内置类型无需装配。渲染未被
 覆盖的完整输出（容器、变换 wrapper、自定义类型）时，项目注册自定义

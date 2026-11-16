@@ -4,7 +4,10 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    anims::{creation::WritingAnim, morph::MorphAnim},
+    anims::{
+        creation::{Unwrite, Write},
+        morph::Morph,
+    },
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -80,7 +83,11 @@ fn ranim_logo(r: &mut RanimScene) {
     let logo = build_logo(logo_width);
     let mut logo_parts = logo.map(|mut item| {
         (
-            seq![item.write().with_duration(3.0).with_rate_func(smooth)],
+            seq![
+                item.anim_mut(Write)
+                    .with_duration(3.0)
+                    .with_rate_func(smooth)
+            ],
             item,
         )
     });
@@ -119,7 +126,7 @@ fn ranim_logo(r: &mut RanimScene) {
         .for_each(|(chunk, (scale, anchor))| {
             chunk.for_each(|(sequence, item)| {
                 sequence.push(
-                    item.morph(|data| {
+                    item.anim_mut(Morph::to(item.clone().with(|data| {
                         data.with_origin(anchor, |x| {
                             x.scale(scale);
                         });
@@ -127,7 +134,7 @@ fn ranim_logo(r: &mut RanimScene) {
                             x.scale(dvec3(0.9, 0.9, 1.0));
                         });
                         data.shift(dvec3(0.0, 1.3, 0.0));
-                    })
+                    })))
                     .with_rate_func(smooth),
                 );
             })
@@ -136,7 +143,7 @@ fn ranim_logo(r: &mut RanimScene) {
     text_sequence.forward(3.5).push(
         ranim_text
             .iter_mut()
-            .map(|item| item.write())
+            .map(|item| item.anim_mut(Write))
             .into_lagged(0.2)
             .with_duration(2.0),
     );
@@ -158,12 +165,16 @@ fn ranim_logo(r: &mut RanimScene) {
     text_sequence.hold(1.0);
 
     logo_parts.iter_mut().for_each(|(sequence, item)| {
-        sequence.push(item.unwrite().with_duration(3.0).with_rate_func(smooth));
+        sequence.push(
+            item.anim_mut(Unwrite)
+                .with_duration(3.0)
+                .with_rate_func(smooth),
+        );
     });
     text_sequence.push(
         ranim_text
             .iter_mut()
-            .map(|item| item.unwrite())
+            .map(|item| item.anim_mut(Unwrite))
             .into_lagged(0.0),
     );
 

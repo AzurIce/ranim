@@ -50,11 +50,11 @@ fn main() {
 [命令行入口](./cli.md)。`inspect` 是纯 CPU 查询，不执行渲染装配
 （`RenderSetup`）的 GPU 回调。
 
-动画代码通常从 prelude、item 类型和对应的动画扩展 trait 中导入 API：
+动画代码通常从 prelude、Item 类型和动画操作参数中导入 API：
 
 ```rust
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::fading::{FadeIn, FadeOut},
     color::palettes::manim,
     items::vitem::geometry::Square,
     prelude::*,
@@ -63,8 +63,8 @@ use ranim::{
 
 ### Prelude 覆盖什么
 
-`ranim::prelude::*` 覆盖日常作者 API：`Eval` / `IntoAnimNode` / `Unplaced`
-/ `PlaybackExt` 等动画协议，`AnimSequence` / `AnimStack` / `AnimLagged` 与
+`ranim::prelude::*` 覆盖日常作者 API：`AnimDef` / `AnimDefNode`、`AnimRecipe` /
+`AnimWriteBack`、`Eval` / `Unplaced` / `PlaybackExt`，`AnimSequence` / `AnimStack` / `AnimLagged` 与
 `seq!` / `stack!` / `lagged!`，`Pure` / `Iterative` / `Static`，`Sound` /
 `AudioClip`，以及 `RanimScene` / `TimeMark` / `App` / `Plugin`。
 
@@ -73,12 +73,12 @@ use ranim::{
 ```rust
 use ranim_core::audio::AudioError;
 use ranim_core::animation::build::{At, Paramed};
-use ranim_core::animation::node::{AnimNode, AnimationInfo};
+use ranim_core::animation::node::AnimNode;
 use ranim_core::frame::EvaluatedFrame;
 ```
 
 - `EvaluatedFrame`：读取求值结果或直接驱动渲染时使用；
-- `AnimNode` / `AnimationInfo`：运行时 introspection API；
+- `AnimNode`：配方构建出的运行节点；Inspector 和 timeline 直接读取 `AnimDefNode` 定义树；
 - `At` / `Paramed`：需要给返回值命名的 timing wrapper；
 - `AudioError`：音频解码/文件错误处理。
 
@@ -89,7 +89,7 @@ use ranim_core::frame::EvaluatedFrame;
 ```rust
 // src/lib.rs
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::fading::{FadeIn, FadeOut},
     color::palettes::manim,
     items::vitem::geometry::Square,
     prelude::*,
@@ -104,9 +104,9 @@ pub fn hello(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .push(square.clone().fade_in())
+        .push(square.anim_ref(FadeIn))
         .hold(1.0)
-        .push(square.fade_out());
+        .push(square.anim(FadeOut));
 
     let mut camera = AnimSequence::new();
     camera
@@ -278,10 +278,10 @@ r.play(content);
 
 ```rust
 sequence
-    .push(square.fade_in())
+    .push(square.anim_ref(FadeIn))
     .hold(1.0)    // 保持淡入后的状态
     .forward(0.5) // 接下来 0.5 秒没有该 Sequence 的输出
-    .push(circle.fade_in());
+    .push(circle.anim_ref(FadeIn));
 ```
 
 ### `show` 与 `hide`
@@ -323,9 +323,19 @@ r.play(layers);
 
 `AnimStack` 的 duration 是最长子动画的 duration。较短子动画结束后不会自动保持到 Stack 结束。
 
-## 类型转换与动画扩展 trait
+## 类型转换与动画参数
 
-动画方法由 requirement/extension trait 提供，使用前需要导入对应 trait。例如 `fade_in` 来自 `FadingAnim`，`morph_to` 来自 `MorphAnim`，`write`/`unwrite` 来自 `WritingAnim`。
+`FadeIn`、`Morph`、`Write` 等配方描述动画做什么，通过 prelude 中的 `ItemAnimExt`
+绑定初始状态：
+
+- `item.anim(recipe)` 接管输入。
+- `item.anim_ref(recipe)` 克隆输入，不修改原值，也不长期借用它。
+- `item.anim_mut(recipe)` 先克隆原值，再**立即**将配方终态写回；要求
+  `AnimWriteBack<T>`，便于从这个终态继续构造下一段动画。
+
+返回的 `AnimDef<T, R>` 保留 `initial` 和 `recipe`；播放或 `build(&self)` 不会再次
+写回原变量。所有权、快照、写回顺序和连续构造示例见
+[动画系统的「输入绑定」一节](./understand/core/anim.md#输入绑定)。
 
 有些动画只对更底层的 `VItem` 实现。几何 item 可以通过 `VItem::from` 或 `.into()` 转换：
 

@@ -1,6 +1,6 @@
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::morph::Morph,
     color::palettes::manim,
     core::animation::{compose::sequence::AnimSequence, eval::StaticAnim},
     glam::{DVec3, dvec2, dvec3},
@@ -58,9 +58,9 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
         for j in 0..i {
             for (sequence, rect) in rects.get_disjoint_mut([j, j + 1]).unwrap() {
                 sequence.push(
-                    rect.morph(|rect| {
+                    rect.anim_mut(Morph::to(rect.clone().with(|rect| {
                         rect.set_fill_color(manim::BLUE_C.with_alpha(0.5));
-                    })
+                    })))
                     .with_duration(anim_step_duration)
                     .with_rate_func(linear),
                 );
@@ -74,9 +74,9 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                     .zip([shift_right, -shift_right])
                 {
                     sequence.push(
-                        rect.morph(|rect| {
+                        rect.anim_mut(Morph::to(rect.clone().with(|rect| {
                             rect.shift(shift);
-                        })
+                        })))
                         .with_duration(anim_step_duration)
                         .with_rate_func(linear),
                     );
@@ -88,9 +88,9 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
 
             for (sequence, rect) in rects.get_disjoint_mut([j, j + 1]).unwrap() {
                 sequence.push(
-                    rect.morph(|rect| {
+                    rect.anim_mut(Morph::to(rect.clone().with(|rect| {
                         rect.set_fill_color(manim::WHITE.with_alpha(0.5));
-                    })
+                    })))
                     .with_duration(anim_step_duration)
                     .with_rate_func(linear),
                 );

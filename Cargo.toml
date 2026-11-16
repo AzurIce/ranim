@@ -97,6 +97,7 @@ cmd-render = [
   "dep:anyhow",
 ]
 cmd-preview = [
+  "cmd-app",
   "cmd-render",
   "dep:rodio",
   "dep:egui",
@@ -106,6 +107,8 @@ cmd-preview = [
   "dep:bytemuck",
   "dep:wgpu-profiler",
 ]
+# Read-only scene browser and animation inspector, without audio playback.
+cmd-app = ["cmd-render", "dep:egui", "dep:eframe"]
 
 [dependencies]
 ranim-core.workspace = true

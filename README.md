@@ -121,6 +121,56 @@ pub fn app() -> ranim::wasm::WasmApp {
 and render configuration; `app.build()` finalizes the project for either host.
 See [project entry](./book/project-entry.md) for setup and platform bindings.
 
+#### Parameter-based animations
+
+```rust,ignore
+use ranim::{anims::{fading::{FadeIn, FadeOut}, rotating::Rotate}, prelude::*};
+
+let fade = item.anim_ref(FadeIn); // clone input, leave it unchanged
+let turn = item.anim_mut(Rotate::new(angle, axis)); // snapshot input, write back final state now
+let exit = item.anim(FadeOut).with_duration(2.0); // consume input
+```
+
+`AnimDef<T, R>` retains `initial` and `recipe`; `AnimRecipe::build` constructs an
+independent runtime tree without consuming that definition. `ItemAnimExt` provides
+the input-binding methods; `anim_ref` clones rather than keeping a borrow, and
+`anim_mut` snapshots the original input before immediately writing back the
+recipe's terminal state. It additionally requires `AnimWriteBack<T>`; playback
+settings and later builds do not repeat or undo this write-back.
+See [input binding](./book/understand/core/anim.md#输入绑定) for ownership, snapshots,
+write-back order, and sequential authoring examples.
+
+Custom cloneable `Eval` implementations use `.into_animation()` for a retained
+template, or `AnimNode::from_eval(eval, duration)` inside a recipe.
+
+Definition and runtime trees both use `Children / Leaf`, but one recipe leaf may
+build an entire runtime subtree. Playback wrappers and composition operate on
+definitions; rebuilding borrows them without replacing their inputs or recipes.
+See [animation architecture](./book/understand/core/anim.md) for type erasure,
+playback overrides, snapshot sampling, and the inspection/persistence boundary.
+
+#### Scene browser and animation inspector
+
+The `app` command opens a read-only egui browser: select a scene on the left,
+expand its definition tree, and select a node to inspect timing, rate curves,
+and recipe type names. Definitions build lazily on the UI thread; a failed
+constructor is reported without closing the browser.
+The browser and preview timeline read retained definitions directly, without
+expanding recipe-generated runtime subtrees.
+
+```sh
+# Any project's run_cli entry (enabled by cmd-app, also included in cmd-preview):
+cargo run --example hello_ranim -- app
+
+# All bundled examples, with example-qualified scene names (run at repo root):
+cargo run -p ranim-examples --features cmd-app --bin examples-inspector
+```
+
+The Inspector reads definition structure and playback settings without animation
+type registration. Rust type names identify recipes for display; they are not
+persistent scene identities. The browser does not reflect arbitrary input or
+recipe fields, edit animations, or save KDL.
+
 #### Experimental scene hot reload
 
 Enable `subsecond` with `cmd-preview` and use Dioxus CLI:

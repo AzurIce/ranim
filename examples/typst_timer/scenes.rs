@@ -157,6 +157,7 @@ fn format_milliseconds(milliseconds: u64) -> [char; 9] {
     ]
 }
 
+#[derive(Clone)]
 struct AtlasTimerEval {
     atlas: Arc<GlyphAtlas>,
     timer: Timer,
@@ -167,9 +168,11 @@ impl AtlasTimerEval {
         Self { atlas, timer }
     }
 
-    fn into_animation(self) -> impl IntoAnimNode {
+    fn into_animation(self) -> impl Into<AnimDefNode> {
         let duration_secs = self.timer.duration_secs;
-        self.with_duration(duration_secs).with_rate_func(linear)
+        EvalExt::into_animation(self)
+            .with_duration(duration_secs)
+            .with_rate_func(linear)
     }
 }
 
@@ -194,6 +197,7 @@ impl Eval for AtlasTimerEval {
     }
 }
 
+#[derive(Clone)]
 struct RecompileTimerEval {
     glyph_scale: f64,
     timer: Timer,
@@ -204,9 +208,11 @@ impl RecompileTimerEval {
         Self { glyph_scale, timer }
     }
 
-    fn into_animation(self) -> impl IntoAnimNode {
+    fn into_animation(self) -> impl Into<AnimDefNode> {
         let duration_secs = self.timer.duration_secs;
-        self.with_duration(duration_secs).with_rate_func(linear)
+        EvalExt::into_animation(self)
+            .with_duration(duration_secs)
+            .with_rate_func(linear)
     }
 }
 
@@ -233,7 +239,7 @@ impl Eval for RecompileTimerEval {
     }
 }
 
-fn timer_camera(timer: Timer) -> impl IntoAnimNode {
+fn timer_camera(timer: Timer) -> impl Into<AnimDefNode> {
     CameraFrame {
         frame_height: 5.0,
         ..Default::default()
@@ -242,7 +248,7 @@ fn timer_camera(timer: Timer) -> impl IntoAnimNode {
     .with_duration(timer.duration_secs)
 }
 
-fn timer_label(timer: Timer) -> impl IntoAnimNode {
+fn timer_label(timer: Timer) -> impl Into<AnimDefNode> {
     let mut label = TypstText::new("ELAPSED TIME");
     label
         .scale_to(ScaleHint::PorportionalY(0.32))

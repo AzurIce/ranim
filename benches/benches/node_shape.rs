@@ -15,7 +15,7 @@
 //! - `eval`  — visual eval, one `eval_at` per frame (60 fps × 5 s);
 //! - `walk`  — per-sample audio walk (240k samples), the residual/bake
 //!   navigation path;
-//! - `info`  — the introspection tree (`AnimationInfo` equivalent).
+//! - `info`  — a runtime introspection snapshot.
 //!
 //! Correctness cross-check: both designs must agree on eval outputs, audio
 //! samples, and info trees before benchmarking.

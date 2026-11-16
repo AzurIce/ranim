@@ -13,10 +13,7 @@ use std::{f64::consts::TAU, sync::Arc};
 
 use midi::parse_song;
 use ranim::{glam::DVec3, prelude::*, utils::rate_functions::linear};
-use ranim_core::animation::{
-    build::{IntoAnimNode, Unplaced},
-    eval::StaticAnim,
-};
+use ranim_core::animation::{build::Unplaced, eval::StaticAnim};
 use visual::{
     FRAME_HEIGHT, HitEffectsEval, MidiNotesEval, PianoKeyboardEval, PianoLayout, SingleNoteEval,
     make_background,
@@ -88,18 +85,20 @@ fn common_layers(song: &Arc<midi::MidiSong>, layout: PianoLayout) -> AnimStack {
             song: song.clone(),
             layout,
         }
+        .into_animation()
         .with_duration(duration)
         .with_rate_func(linear),
         HitEffectsEval {
             song: song.clone(),
             layout,
         }
+        .into_animation()
         .with_duration(duration)
         .with_rate_func(linear),
     ]
 }
 
-fn camera(duration: f64) -> impl IntoAnimNode {
+fn camera(duration: f64) -> impl Into<AnimDefNode> {
     CameraFrame {
         pos: DVec3::ZERO,
         frame_height: FRAME_HEIGHT,
@@ -124,6 +123,7 @@ fn midi_visualizer(r: &mut RanimScene) {
             song: song.clone(),
             layout,
         }
+        .into_animation()
         .with_duration(duration)
         .with_rate_func(linear),
         common_layers(&song, layout),
@@ -145,6 +145,7 @@ fn midi_visualizer_per_note(r: &mut RanimScene) {
         let duration_secs = note_eval.duration_secs();
         notes.push(
             note_eval
+                .into_animation()
                 .with_duration(duration_secs)
                 .with_rate_func(linear)
                 .at(start_sec),

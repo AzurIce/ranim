@@ -9,16 +9,14 @@
 
 use crate::{
     SealedRanimScene, TimeMark,
-    animation::{
-        eval::OutputContext,
-        node::{AnimNode, AnimationInfo},
-    },
+    animation::{compose::stack::AnimStack, eval::OutputContext, node::AnimNode},
     audio::MASTER_SAMPLE_RATE,
     frame::EvaluatedFrame,
 };
 
 /// Lightweight scene evaluation session.
 pub struct SceneEvaluator {
+    definition: AnimStack,
     cells: Vec<AnimNode>,
     total_secs: f64,
     audio: std::sync::Arc<[f32]>,
@@ -34,6 +32,7 @@ impl SceneEvaluator {
     #[allow(unused_variables)]
     pub fn new(scene: SealedRanimScene, logic_fps: f64) -> Self {
         Self {
+            definition: scene.definition,
             cells: scene.animations,
             total_secs: scene.total_secs,
             audio: scene.audio,
@@ -93,9 +92,9 @@ impl SceneEvaluator {
         &self.time_marks
     }
 
-    /// Hierarchical runtime animation information for preview tooling.
-    pub fn animation_infos(&self) -> Vec<AnimationInfo> {
-        self.cells.iter().map(AnimNode::animation_info).collect()
+    /// Retained scene definitions, without expanding recipe-generated runtime nodes.
+    pub fn definition(&self) -> &AnimStack {
+        &self.definition
     }
 
     /// Last sampled target (the `clock` reading for preview tooling).
@@ -125,7 +124,7 @@ mod tests {
         RanimScene, SealedRanimScene,
         animation::{
             build::{PlaybackExt, Unplaced},
-            eval::{Eval, iterative::Iterative},
+            eval::{Eval, EvalExt, iterative::Iterative},
         },
         seq,
     };
@@ -134,6 +133,7 @@ mod tests {
     struct PositionX(f32);
 
     /// A stateless segment: x = alpha.
+    #[derive(Clone)]
     struct ProgressX;
 
     impl Eval for ProgressX {
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn functional_scene_matches_pure_eval() {
         let mut scene = RanimScene::new();
-        scene.play(ProgressX.with_duration(2.0));
+        scene.play(ProgressX.into_animation().with_duration(2.0));
         let sealed = scene.seal();
 
         let mut ev = SceneEvaluator::new(sealed, 120.0);
@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn repeated_samples_replace_the_whole_output_frame() {
         let mut scene = RanimScene::new();
-        scene.play(ProgressX.with_duration(2.0));
+        scene.play(ProgressX.into_animation().with_duration(2.0));
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
         let mut frame = EvaluatedFrame::new();
         frame.push((99, 0), String::from("previous output"));
@@ -245,6 +245,8 @@ mod tests {
         let mut evaluator = scene.seal().into_evaluator(120.0);
         let mut frame = EvaluatedFrame::new();
 
+        // Building runtime snapshots can clone; measure frame sampling only.
+        clones.store(0, Ordering::SeqCst);
         evaluator.sample_at(0.5, &mut frame);
         assert_eq!(clones.load(Ordering::SeqCst), 0);
         assert_eq!(frame.items::<Raw>()[0].value.values, [42, 43]);

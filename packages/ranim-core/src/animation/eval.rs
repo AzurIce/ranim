@@ -36,6 +36,21 @@ pub mod pure;
 /// [`Pure`](crate::animation::eval::pure::Pure) wraps a raw closure
 /// `Fn(f64) -> T`. Implementing `Eval` directly remains the path for
 /// exotic segments.
+///
+/// Implementing this trait alone does not select a playback duration:
+///
+/// ```compile_fail
+/// use ranim_core::prelude::*;
+/// struct Content;
+/// impl Eval for Content {
+///     type Output = f64;
+///     fn eval_alpha(&self, alpha: f64) -> f64 { alpha }
+/// }
+/// let _ = Content.with_duration(2.0);
+/// ```
+///
+/// Use `content.into_animation()` for the explicit one-second adapter, or
+/// `AnimNode::from_eval(content, duration_secs)` for an explicit window.
 pub trait Eval {
     /// Value produced by this evaluator.
     ///
@@ -64,6 +79,12 @@ pub trait Eval {
 /// `apply_to` to write an item's end state (or `apply_alpha_to` to write an
 /// arbitrary progress state) while constructing the animation.
 pub trait EvalExt: Eval + Sized {
+    // TODO: Eval should not participate in constructing animation, it
+    // should be just the evaluation core
+    /// Explicitly opt a custom evaluator into the one-second playback adapter.
+    fn into_animation(self) -> EvalAnim<Self> {
+        EvalAnim(self)
+    }
     /// Write the state at progress `alpha` into `item` and return this
     /// evaluator (defined through `eval_alpha`).
     fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self {
@@ -79,6 +100,53 @@ pub trait EvalExt: Eval + Sized {
 }
 
 impl<E: Eval + Sized> EvalExt for E {}
+
+/// Explicit playback adapter for a prepared custom evaluator.
+///
+/// This definition retains a cloneable evaluator template and explicitly selects
+/// a one-second default window. Each build clones a fresh execution instance.
+pub struct EvalAnim<E>(pub E);
+
+impl<E> super::build::Unplaced for EvalAnim<E>
+where
+    E: Eval + Clone + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+}
+
+impl<E> From<EvalAnim<E>> for super::def_node::AnimDefNode
+where
+    E: Eval + Clone + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+    fn from(definition: EvalAnim<E>) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl<E> super::def_node::DynAnimDef for EvalAnim<E>
+where
+    E: Eval + Clone + 'static,
+    E::Output: Clone + Send + Sync + 'static,
+{
+    fn anim_name(&self) -> &'static str {
+        std::any::type_name::<E>()
+    }
+    fn build(&self) -> super::node::AnimNode {
+        super::node::AnimNode::from_eval(self.0.clone(), 1.0)
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> super::build::Unplaced for Static<T> {}
+impl<T: Clone + Send + Sync + 'static> From<Static<T>> for super::def_node::AnimDefNode {
+    fn from(definition: Static<T>) -> Self {
+        Self::leaf(definition)
+    }
+}
+impl<T: Clone + Send + Sync + 'static> super::def_node::DynAnimDef for Static<T> {
+    fn build(&self) -> super::node::AnimNode {
+        super::node::AnimNode::from_eval(self.clone(), 1.0)
+    }
+}
 
 /// Frame insertion state shared by the leaves of one top-level animation.
 pub(crate) struct OutputContext<'a> {
@@ -163,6 +231,12 @@ pub(super) struct HeldOutput(Vec<DynOutput>);
 impl HeldOutput {
     pub(super) fn new(values: Vec<DynOutput>) -> Self {
         Self(values)
+    }
+}
+
+impl super::def_node::DynAnimDef for HeldOutput {
+    fn build(&self) -> super::node::AnimNode {
+        super::node::constant_node(self.0.clone(), 0.0..0.0)
     }
 }
 

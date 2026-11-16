@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{camera::CameraFrameAnim, morph::MorphAnim},
+    anims::{camera::Orbit, morph::Morph},
     color::palettes::manim,
     glam::DVec3,
     items::mesh::{MeshItem, Sphere, Surface},
@@ -43,25 +43,25 @@ fn mesh_morph(r: &mut RanimScene) {
 
     let mut mesh_sequence = seq![
         sphere
-            .morph_to(torus.clone())
+            .anim_mut(Morph::to(torus.clone()))
             .with_duration(2.5)
             .with_rate_func(smooth)
     ];
     mesh_sequence.hold(0.5).push(
         torus
-            .morph_to(disc.clone())
+            .anim_mut(Morph::to(disc.clone()))
             .with_duration(2.5)
             .with_rate_func(smooth),
     );
     mesh_sequence.hold(0.5).push(
-        disc.morph_to(sphere_red)
+        disc.anim_mut(Morph::to(sphere_red))
             .with_duration(2.5)
             .with_rate_func(smooth),
     );
 
     let total_secs = 9.0;
     let camera = cam
-        .orbit(DVec3::ZERO, 2.0)
+        .anim_mut(Orbit::new(DVec3::ZERO, 2.0))
         .with_duration(total_secs)
         .with_rate_func(linear);
     mesh_sequence.hold_to(total_secs);

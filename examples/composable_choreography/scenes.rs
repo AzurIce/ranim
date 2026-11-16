@@ -5,7 +5,10 @@
 //! preview Timeline.
 
 use ranim::{
-    anims::{fading::FadingAnim, morph::MorphAnim},
+    anims::{
+        fading::{FadeIn, FadeOut},
+        morph::Morph,
+    },
     color::palettes::manim,
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Square},
@@ -24,34 +27,34 @@ const WAVE_DELAY_SECS: f64 = 0.16;
 /// an already-built animation tree.
 fn tile_phrase(mut tile: VItem, shift: DVec3, angle: f64) -> AnimSequence {
     let mut phrase = seq![
-        tile.fade_in()
+        tile.anim_mut(FadeIn)
             .with_duration(FADE_SECS)
             .with_rate_func(smooth),
     ];
     phrase
         .push(
-            tile.morph(|item| {
+            tile.anim_mut(Morph::to(tile.clone().with(|item| {
                 item.shift(shift);
                 item.with_origin(AabbPoint::CENTER, |transform| {
                     transform.rotate_on_z(angle);
                 });
-            })
+            })))
             .with_duration(MOVE_SECS)
             .with_rate_func(smooth),
         )
         .hold(HOLD_SECS)
         .push(
-            tile.morph(|item| {
+            tile.anim_mut(Morph::to(tile.clone().with(|item| {
                 item.with_origin(AabbPoint::CENTER, |transform| {
                     transform.rotate_on_z(-angle);
                 });
                 item.shift(-shift);
-            })
+            })))
             .with_duration(MOVE_SECS)
             .with_rate_func(smooth),
         )
         .push(
-            tile.fade_out()
+            tile.anim_mut(FadeOut)
                 .with_duration(FADE_SECS)
                 .with_rate_func(smooth),
         );

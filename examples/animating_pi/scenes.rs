@@ -7,7 +7,7 @@ use ranim::{
     prelude::*,
     utils::rate_functions::smooth,
 };
-use ranim_anims::morph::MorphAnim;
+use ranim_anims::morph::Morph;
 use ranim_core::animation::eval::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
@@ -54,21 +54,21 @@ fn animating_pi(r: &mut RanimScene) {
         .hold(1.0)
         .push(
             vitems
-                .morph(|x| {
+                .anim_mut(Morph::to(vitems.clone().with(|x| {
                     x.apply_complex_map(|c| c.exp());
-                })
+                })))
                 .with_duration(5.0)
                 .with_rate_func(smooth),
         )
         .hold(1.0)
         .push(
             vitems
-                .morph(|x| {
+                .anim_mut(Morph::to(vitems.clone().with(|x| {
                     x.apply_point_func(|p| {
                         p.x += 0.5 * p.y.sin();
                         p.y += 0.5 * p.x.cos();
                     });
-                })
+                })))
                 .with_duration(5.0)
                 .with_rate_func(smooth),
         )
