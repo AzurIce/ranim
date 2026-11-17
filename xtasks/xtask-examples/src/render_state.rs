@@ -1,4 +1,4 @@
-//! Successful render provenance, independent of generated site template data.
+//! Successful local render provenance, independent of uploads and site data.
 use crate::Example;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};

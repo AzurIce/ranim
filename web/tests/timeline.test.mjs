@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { projectTimeline, buildTimelineTracks, defaultExpanded } from "../static/ranim-timeline.js";
+import { projectTimeline, buildTimelineTracks, defaultExpanded } from "../ranim-timeline.js";
 
 function leaf(range, options = {}) {
   return { name: "example::FadeIn<Item>", kind: "anim", range, contentDuration: 1, enabled: true, simStep: null, children: [], ...options };

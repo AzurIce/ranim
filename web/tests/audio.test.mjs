@@ -1,6 +1,6 @@
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { AudioPlayback } from "../static/ranim-audio.js";
+import { AudioPlayback } from "../ranim-audio.js";
 
 // Controllable device time lets these checks distinguish an audio clock from
 // elapsed wall time, and exercise late browser permission failures precisely.

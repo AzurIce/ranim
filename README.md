@@ -103,7 +103,7 @@ fn project() -> ranim::RanimApp {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    run_cli(project());
+    ranim::cmd::run_cli(project()).unwrap();
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -170,6 +170,12 @@ The Inspector reads definition structure and playback settings without animation
 type registration. Rust type names identify recipes for display; they are not
 persistent scene identities. The browser does not reflect arbitrary input or
 recipe fields, edit animations, or save KDL.
+
+#### Browser components
+
+The framework-independent browser ES modules live in [`web/`](./web/README.md).
+They require no frontend build step and are shared by the website and rustdoc.
+The viewport renders a project's WASM module; controls provide playback and a timeline.
 
 #### Experimental scene hot reload
 

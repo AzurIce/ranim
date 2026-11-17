@@ -11,4 +11,4 @@ template = "page"
 # before templates from Cargo sources and tracked shadow refs, without uploads.
 [site.extensions.examples]
 command = ["cargo", "examples", "site"]
-watch = ["../Cargo.toml", "../examples", "../assets", "../xtasks/xtask-examples", "../.shadow/refs", "../shadow.toml", "render-state.json"]
+watch = ["../Cargo.toml", "../examples", "../assets", "../web", "../xtasks/xtask-examples", "../.shadow/refs", "../shadow.toml", "render-state.json"]

@@ -1,8 +1,35 @@
-//! Ranim's build-scoped Notist SSG command. Pages and template data are
-//! generated from Cargo, source files, render provenance and published refs.
+//! Ranim's build-scoped Notist SSG command (`cargo examples site`).
+//!
+//! `website/Notist.toml` starts one process for two JSONL events:
+//! - `before_compile` discovers bundled examples from Cargo, source files,
+//!   READMEs, render provenance and published refs. It returns generated source
+//!   documents and captures template data and browser assets for this build.
+//! - `before_template` merges that captured data and those files with prior
+//!   extensions' contributions. Final rendered pages remain read-only.
+//!
+//! Each response is flushed immediately, without waiting for stdin EOF. The
+//! local `SiteInput` stages generated content; it is not a wire-protocol input.
+//!
+//! # Web Components in the website
+//!
+//! The request root is `website/`; its parent locates the repository's `web/`
+//! directory. This extension reads the five shared JavaScript modules there and
+//! contributes them through the `files` response at the site's output root.
+//! Notist publishes them without a frontend build step or a copy into
+//! `website/static/`, preserving their public URLs and relative imports.
+//!
+//! `website/templates/components/player.tera` emits the `<ranim-viewport>` and
+//! `<ranim-controls>` tags. `website/static/site.js` imports their modules and
+//! binds each control bar to its viewport; the modules register their own custom
+//! elements. This is ordinary HTML/ES-module integration, not Notist's `.notc`
+//! content-function/component binding mechanism.
+//!
+//! Scene WASM packages are built separately by `cargo examples build`. This
+//! command does not compile WASM, render scenes, upload media or change render
+//! provenance; it only prepares the site's documents, data and browser assets.
 use crate::{
-    Example, OutputFile, get_examples, render_state::RenderState, rewrite_readme_links,
-    shadow::Shadow, split_output_files,
+    Example, OutputFile, PREVIEW_COMPONENTS, get_examples, render_state::RenderState,
+    rewrite_readme_links, shadow::Shadow, split_output_files,
 };
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
@@ -18,6 +45,7 @@ use std::{
 struct SiteInput {
     documents: BTreeMap<String, String>,
     data: BTreeMap<String, Value>,
+    files: BTreeMap<String, Value>,
 }
 #[derive(Deserialize)]
 struct Request {
@@ -36,6 +64,8 @@ enum Event {
     BeforeTemplate {
         pages: Vec<Value>,
         data: BTreeMap<String, Value>,
+        #[serde(default)]
+        files: BTreeMap<String, Value>,
     },
 }
 #[derive(Serialize)]
@@ -46,6 +76,8 @@ struct Response {
     documents: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<BTreeMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    files: Option<BTreeMap<String, Value>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     errors: Vec<String>,
 }
@@ -86,6 +118,7 @@ pub fn exchange(mut reader: impl BufRead, mut writer: impl Write) -> Result<()> 
             event,
             documents: None,
             data: None,
+            files: None,
             errors: vec![],
         };
         let result: Result<()> = (|| {
@@ -96,8 +129,8 @@ pub fn exchange(mut reader: impl BufRead, mut writer: impl Write) -> Result<()> 
             if request.version != 2 {
                 bail!("unsupported site extension request version");
             }
-            // The host owns config and final Pages; this extension changes
-            // only sources and its generated template data.
+            // The host owns config and final Pages; this extension contributes
+            // sources, template data and the shared Web Component modules.
             let _config = request.config;
             let website = request.root.canonicalize()?;
             let root = website.parent().context("website has no project root")?;
@@ -113,22 +146,27 @@ pub fn exchange(mut reader: impl BufRead, mut writer: impl Write) -> Result<()> 
                         root,
                         SiteInput {
                             documents,
-                            data: BTreeMap::new(),
+                            ..SiteInput::default()
                         },
                     )?;
-                    generated = Some((website, input.data));
+                    generated = Some((website, input.data, input.files));
                     response.documents = Some(input.documents);
                 }
-                Event::BeforeTemplate { pages, mut data } => {
-                    let (prepared_root, generated_data) = generated
+                Event::BeforeTemplate {
+                    pages: _pages,
+                    mut data,
+                    mut files,
+                } => {
+                    let (prepared_root, generated_data, generated_files) = generated
                         .take()
                         .context("before_template requires before_compile in the same process")?;
                     if prepared_root != website {
                         bail!("site root changed between events");
                     }
-                    let _pages = pages;
                     data.extend(generated_data);
+                    files.extend(generated_files);
                     response.data = Some(data);
+                    response.files = Some(files);
                     finished = true;
                 }
             }
@@ -156,6 +194,14 @@ fn index(title: &str) -> Result<String> {
 
 /// Prepare current inputs without generating per-example source or data files.
 fn prepare(root: &Path, mut input: SiteInput) -> Result<SiteInput> {
+    for name in PREVIEW_COMPONENTS {
+        let path = root.join("web").join(name);
+        let source = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        input
+            .files
+            .insert((*name).into(), serde_json::json!({"text": source}));
+    }
     let examples = get_examples(root)?;
     let shadow = Shadow::load(root)?;
     let state = RenderState::load(root)?;
@@ -285,6 +331,9 @@ mod tests {
                     .as_nanos()
             ));
             let fixture = Self(root);
+            for name in PREVIEW_COMPONENTS {
+                fixture.write(&format!("web/{name}"), &format!("// {name}\n"));
+            }
             fixture.write("website/content/index.md", "Home");
             fixture.write(
                 "Cargo.toml",
@@ -343,7 +392,11 @@ path = "examples/hidden/main.rs"
             serde_json::json!({
                 "version": 2, "event": "before_template", "root": self.0.join("website"),
                 "config": {}, "pages": [{"title": "Final title", "html": "<p>Final</p>"}],
-                "data": {"custom": {"value": 42}, "earlier-extension": {"ready": true}}
+                "data": {"custom": {"value": 42}, "earlier-extension": {"ready": true}},
+                "files": {
+                    "native.txt": {"text": "你好"},
+                    "assets/raw.bin": {"base64": "AP8B"}
+                }
             })
         }
     }
@@ -519,6 +572,7 @@ path = "examples/hidden/main.rs"
                 .is_some()
         );
         assert!(output[0].get("data").is_none());
+        assert!(output[0].get("files").is_none());
         assert!(output[0].get("input").is_none());
         assert_eq!(output[1]["version"], 2);
         assert_eq!(output[1]["event"], "before_template");
@@ -527,11 +581,26 @@ path = "examples/hidden/main.rs"
         assert_eq!(output[1]["data"]["foo"]["sources"][0]["name"], "scenes.rs");
         assert!(output[1].get("documents").is_none());
         assert!(output[1].get("pages").is_none());
+        assert_eq!(output[1]["files"]["native.txt"]["text"], "你好");
+        assert_eq!(output[1]["files"]["assets/raw.bin"]["base64"], "AP8B");
+        assert_eq!(
+            output[1]["files"]["ranim-viewport.js"]["text"],
+            "// ranim-viewport.js\n"
+        );
+        assert_eq!(
+            output[1]["files"].as_object().unwrap().len(),
+            PREVIEW_COMPONENTS.len() + 2
+        );
         assert!(
             output
                 .iter()
                 .all(|response| response.get("errors").is_none())
         );
+
+        let mut without_files = fixture.template_request();
+        without_files.as_object_mut().unwrap().remove("files");
+        let output = responses(&[fixture.request(), without_files]);
+        assert!(output[1].get("errors").is_none());
     }
 
     #[test]
@@ -543,6 +612,7 @@ path = "examples/hidden/main.rs"
             ("stage", serde_json::json!("render")),
             ("data", serde_json::json!({})),
             ("pages", serde_json::json!([])),
+            ("files", serde_json::json!({})),
         ] {
             let mut invalid = fixture.request();
             invalid[field] = value;
@@ -651,6 +721,7 @@ path = "examples/hidden/main.rs"
             "examples/geometry/foo/scenes.rs",
             "pub fn changed_between_events() {}\n",
         );
+        fixture.write("web/ranim-viewport.js", "// changed between events\n");
         serde_json::to_writer(&mut host, &fixture.template_request()).unwrap();
         host.write_all(b"\n").unwrap();
         host.flush().unwrap();
@@ -662,6 +733,10 @@ path = "examples/hidden/main.rs"
             second["data"]["foo"]["sources"][0]["code"],
             "pub fn original() {}\n"
         );
+        assert_eq!(
+            second["files"]["ranim-viewport.js"]["text"],
+            "// ranim-viewport.js\n"
+        );
         host.shutdown(Shutdown::Write).unwrap();
         line.clear();
         assert_eq!(reader.read_line(&mut line).unwrap(), 0);
@@ -670,6 +745,10 @@ path = "examples/hidden/main.rs"
         assert_eq!(
             next_build[1]["data"]["foo"]["sources"][0]["code"],
             "pub fn changed_between_events() {}\n"
+        );
+        assert_eq!(
+            next_build[1]["files"]["ranim-viewport.js"]["text"],
+            "// changed between events\n"
         );
     }
 

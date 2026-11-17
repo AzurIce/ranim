@@ -36,7 +36,7 @@ enum Commands {
         #[arg(value_name = "EXAMPLES")]
         examples: Vec<String>,
     },
-    /// Render examples, publish media and record successful render hashes.
+    /// Render examples locally and record successful render hashes (no uploads).
     Run {
         /// Skip examples whose last successful render has the current source hash.
         #[arg(long)]

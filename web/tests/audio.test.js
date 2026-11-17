@@ -1,6 +1,6 @@
 // Real WASM, AudioContext and device clock; click Run to grant user activation.
-import "../static/ranim-viewport.js";
-import "../static/ranim-controls.js";
+import "../ranim-viewport.js";
+import "../ranim-controls.js";
 
 const results = document.querySelector("#results");
 const fixtures = document.querySelector("#fixtures");
@@ -39,7 +39,7 @@ function signal(voice) {
 }
 async function viewport(example, scene = example) {
   const view = document.createElement("ranim-viewport");
-  view.setAttribute("src", `../static/examples/${example}/pkg/ranim_example.js`);
+  view.setAttribute("src", `../../website/static/examples/${example}/pkg/ranim_example.js`);
   view.setAttribute("scene", scene);
   fixtures.append(view);
   await eventually(() => view.ready || view.shadowRoot.querySelector(".status").textContent.startsWith("Unable"));
@@ -50,7 +50,7 @@ document.querySelector("#start").addEventListener("click", async (event) => {
   event.target.disabled = true;
   const passed = [];
   try {
-    const { default: init, app } = await import("../static/examples/midi_visualizer/pkg/ranim_example.js");
+    const { default: init, app } = await import("../../website/static/examples/midi_visualizer/pkg/ranim_example.js");
     await init();
     const project = app(), canvas = document.createElement("canvas");
     canvas.width = 320; canvas.height = 180; fixtures.append(canvas);
@@ -151,7 +151,7 @@ document.querySelector("#start").addEventListener("click", async (event) => {
     view.play(); await eventually(() => Math.abs(contexts.at(-1).output?.gain.gain.value - 0.35) < 0.005);
     view.remove();
     const silent = await viewport("arc");
-    const silentProject = (await import("../static/examples/arc/pkg/ranim_example.js")).app();
+    const silentProject = (await import("../../website/static/examples/arc/pkg/ranim_example.js")).app();
     const silentCanvas = document.createElement("canvas");
     const silentRaw = await silentProject.createPreview(silentCanvas, "arc"); silentProject.free();
     assert(silentRaw.audio() === null, "Silent scene exported an audio buffer"); silentRaw.dispose(); silentRaw.free();

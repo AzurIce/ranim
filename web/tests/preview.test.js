@@ -1,8 +1,8 @@
 // Serve the repository root after `cargo examples build arc`, then open
-// /website/tests/preview.test.html. These use a real WebGPU device and WASM module.
+// /web/tests/preview.test.html. These use a real WebGPU device and WASM module.
 const results = document.getElementById("results");
 const fixtures = document.getElementById("fixtures");
-const src = "../static/examples/arc/pkg/ranim_example.js";
+const src = "../../website/static/examples/arc/pkg/ranim_example.js";
 const frame = () => new Promise(requestAnimationFrame);
 
 function assert(condition, message) {
@@ -76,7 +76,7 @@ try {
   const direct = document.createElement("ranim-controls");
   direct.target = primary;
   fixtures.append(direct);
-  await import("../static/ranim-controls.js");
+  await import("../ranim-controls.js");
   assert(!customElements.get("ranim-viewport"), "Controls imported the viewport implementation");
   assert(!direct.shadowRoot.querySelector("canvas"), "Controls own a rendering canvas");
   assert(button(direct).disabled, "Unready target enabled controls");
@@ -88,7 +88,7 @@ try {
   toolbar.append(controls);
   fixtures.append(toolbar);
   assert(controls.target === null && button(controls).disabled, "Missing target should disable controls");
-  await import("../static/ranim-viewport.js");
+  await import("../ranim-viewport.js");
   primary.setAttribute("src", src);
   primary.setAttribute("scene", "arc");
   await expectEvent(primary, "ready", () => fixtures.append(primary));
@@ -98,7 +98,7 @@ try {
   assert(primary.ready && primary.duration === 3 && primary.paused, "Expected a paused three-second scene");
 
   assert(primary.timeline.duration === 3 && primary.timeline.roots.length > 0, "Viewport did not expose animation metadata");
-  const { projectTimeline } = await import("../static/ranim-timeline.js");
+  const { projectTimeline } = await import("../ranim-timeline.js");
   const projected = projectTimeline(primary.timeline);
   const lagged = projected.find((node) => node.children.length === 100);
   assert(lagged && Math.abs(lagged.children.at(-1).end - 3) < 1e-6, "WASM content timing was not projected into scene seconds");

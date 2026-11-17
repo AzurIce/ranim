@@ -72,8 +72,8 @@ reasons is worth more than a large one nobody reads.
 ## Website example media（shadow 管理）
 
 `website/static/examples/` 下的渲染产物（mp4/png）**不入库**，由
-[shadow](https://github.com/AzurIce/shadow) 管理：xtask 在渲染后运行
-`shadow publish` 上传到 TOS。SSG 构建时通过站点扩展
+[shadow](https://github.com/AzurIce/shadow) 管理：渲染只整理本地产物；显式运行
+`cargo examples publish` 才调用 `shadow publish` 上传到 TOS。SSG 构建时通过站点扩展
 `cargo examples site` 从 Cargo targets、源码、README 和 `.shadow/refs/` 生成
 内存中的页面与模板数据，媒体 URL 由 refs 中的 oid 解析。命令使用构建级 JSONL
 协议：before_compile 返回源码，before_template 合并模板数据；两事件共享同一进程，
@@ -83,9 +83,9 @@ reasons is worth more than a large one nobody reads.
 
 - 构建网站：`just website`，扩展自动生成 example 页面与数据，无需渲染、下载媒体或凭证。
 - WASM：`cargo examples build [examples...]`；实际存在的 JS/WASM 决定是否显示 App 页签。
-- 渲染 + 发布：`cargo examples run [examples...]`（需要 `shadow` 在 PATH
-  上，`cargo install --git https://github.com/AzurIce/shadow`）；成功后更新 render state。
-- 不渲染、只发布已有产物：`cargo examples publish`，保持上次成功渲染的 hash。
+- 本地渲染：`cargo examples run [examples...]`，不调用 shadow、不需要上传凭证；成功后更新 render state。
+- 手动发布已有产物：`cargo examples publish`（需要 `shadow` 在 PATH
+  上，`cargo install --git https://github.com/AzurIce/shadow`），不渲染、不修改 render state。
 - `--lazy-run` 仅比较 render state；网站与 WASM 构建不得覆盖该 hash。
 - 凭证在仓库根 `.env`（`TOS_ACCESS_KEY`/`TOS_SECRET_KEY`，已 gitignore，
   绝不提交）

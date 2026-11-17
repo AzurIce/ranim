@@ -99,8 +99,8 @@ impl Shadow {
     }
 
     /// Upload every managed worktree file and write its ref
-    /// (`shadow publish`). Publishing is idempotent: unchanged content is
-    /// skipped by a remote `stat`, so this is cheap to call after every run.
+    /// (`shadow publish`). This explicit, repository-wide operation checks
+    /// every managed file; unchanged remote content is not uploaded again.
     pub fn publish(&self) -> Result<()> {
         let status = Command::new("shadow")
             .arg("publish")
