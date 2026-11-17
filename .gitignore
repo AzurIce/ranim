@@ -81,7 +81,20 @@ output/
 .direnv/
 profile.json.gz
 
-# shadow
+# Generated media and WASM packages stay out of Git.
 /website/static/examples/**
-
 /website/render-state.json.tmp
+
+# shadow
+# Publish media only; WASM packages are built by CI.
+/website/static/examples/**/*.png
+/website/static/examples/**/*.jpg
+/website/static/examples/**/*.jpeg
+/website/static/examples/**/*.svg
+/website/static/examples/**/*.webp
+/website/static/examples/**/*.mp4
+/website/static/examples/**/*.webm
+/website/static/examples/**/*.gif
+!/website/static/examples/*/pkg/**
+!/website/static/examples/getting_started[012]/**
+!/website/static/examples/test/**
