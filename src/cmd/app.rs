@@ -436,7 +436,7 @@ fn show_rate_curve(ui: &mut egui::Ui, rate: fn(f64) -> f64) {
 }
 
 /// Launch a native egui inspector for all scenes registered in the project.
-pub fn run_app(project: RanimApp) -> anyhow::Result<()> {
+pub fn run_app(app: RanimApp) -> anyhow::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0]),
         renderer: eframe::Renderer::Wgpu,
@@ -445,7 +445,7 @@ pub fn run_app(project: RanimApp) -> anyhow::Result<()> {
     eframe::run_native(
         "Ranim Inspector",
         options,
-        Box::new(move |_| Ok(Box::new(InspectorApp::new(project)))),
+        Box::new(move |_| Ok(Box::new(InspectorApp::new(app)))),
     )
     .map_err(|error| anyhow::anyhow!("failed to launch scene inspector: {error}"))
 }
@@ -453,7 +453,7 @@ pub fn run_app(project: RanimApp) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{App, RanimAppExt, RanimScene};
+    use crate::{App, RanimScene};
     use ranim_core::animation::{
         AnimRecipe,
         build::PlaybackExt,
@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn egui_draws_empty_tree_and_selected_node_without_a_window() {
-        let mut app = App::new();
+        let app = App::new();
         let mut inspector = InspectorApp::new(app.build());
         egui::__run_test_ui(|ui| inspector.show(ui));
 

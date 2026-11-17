@@ -649,6 +649,8 @@ pub fn clean_website_examples(
 pub struct ExampleMeta {
     #[serde(default)]
     hide: bool,
+    #[serde(default)]
+    standalone: bool,
 }
 
 pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
@@ -679,6 +681,10 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
     targets
         .iter()
         .map(|v| v.as_table().unwrap())
+        .filter(|item| {
+            let name = item["name"].as_str().unwrap();
+            !metadatas.get(name).is_some_and(|meta| meta.standalone)
+        })
         .map(|item| {
             let name = item["name"].as_str().unwrap().to_string();
             let required_features = item
@@ -775,9 +781,14 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
+        assert!(
+            !examples
+                .iter()
+                .any(|example| matches!(example.name.as_str(), "getting_started" | "test"))
+        );
         for entry in fs::read_dir(root_dir.join("examples")).unwrap() {
             let path = entry.unwrap().path();
-            if path.join("main.rs").exists() {
+            if path.join("main.rs").exists() && path.file_name().unwrap() != "test" {
                 assert!(
                     examples
                         .iter()
@@ -819,10 +830,9 @@ mod test {
                 .required_features,
             ["anims", "render", "gltf"]
         );
-        assert!(
-            arc.code
-                .contains("app.add_plugins(scenes::ScenesPlugin);\n        run_cli(app.build());")
-        );
+        assert!(arc.code.contains(
+            "app.add_plugins(scenes::ScenesPlugin);\n        cmd::run_cli(app.build()).unwrap();"
+        ));
     }
 
     #[test]
@@ -834,9 +844,18 @@ mod test {
             .unwrap();
         let targets = manifest["example"].as_array().unwrap();
         let examples = get_examples(&root).unwrap();
-        assert_eq!(targets.len(), examples.len());
+        let mut bundled_count = 0;
         for target in targets {
             let name = target["name"].as_str().unwrap();
+            if manifest["package"]["metadata"]["example"]
+                .get(name)
+                .and_then(|meta| meta.get("standalone"))
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            bundled_count += 1;
             assert!(!name.ends_with("-wasm"));
             assert!(target.get("crate-type").is_none());
             let features = target["required-features"].as_array().unwrap();
@@ -853,6 +872,7 @@ mod test {
                 "{name}"
             );
         }
+        assert_eq!(bundled_count, examples.len());
     }
 
     #[test]

@@ -2,7 +2,9 @@
 //! the App through direct `add_plugins` installation.
 
 use bevy_ecs::prelude::Resource;
-use ranim::{App, AppExt, OutputFormat, Plugin, SceneConstructor, prelude::*};
+use ranim::{
+    App, AppExt, OutputFormat, Plugin, RanimApp, RanimScene, SceneConstructor, prelude::scene,
+};
 
 #[scene(name = "registered", clear_color = "#112233")]
 #[output(width = 320, height = 180, fps = 24, format = "webm", name = "clip")]
@@ -40,6 +42,9 @@ fn project_plugin_installs_only_explicit_scenes() {
     );
     assert_eq!(project.world().resource::<ProjectConfig>().0, 42);
     assert!(project.is_plugin_added::<ProjectPlugin>());
+
+    let mut project: RanimApp = project.build();
+    assert_eq!(project.plugins_state(), bevy_app::PluginsState::Cleaned);
     assert_eq!(project.scenes().len(), 1);
     assert!(project.scene("unregistered_scene").is_none());
 

@@ -1237,7 +1237,7 @@ pub fn preview_scene(app: crate::RanimApp, scene: Scene) {
 #[cfg(all(test, feature = "subsecond"))]
 mod hot_reload_tests {
     use super::*;
-    use crate::{App, RanimAppExt, RanimScene};
+    use crate::{App, AppExt, RanimScene};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     fn preview(duration: Arc<AtomicUsize>, fail: Arc<AtomicBool>) -> RanimPreviewApp {

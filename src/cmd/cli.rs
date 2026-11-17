@@ -207,18 +207,14 @@ impl ProjectCli {
 /// fn main() {
 ///     let mut app = App::new();
 ///     app.add_plugins(scenes::ScenesPlugin);
-///     run_cli(app.build());
+///     ranim::cmd::run_cli(app.build()).unwrap();
 /// }
 /// ```
 ///
-/// On a command failure the error is logged and the process exits with a
-/// non-zero status.
-pub fn run_cli(app: RanimApp) {
+/// Returns command failures to the caller for error reporting and exit handling.
+pub fn run_cli(app: RanimApp) -> Result<()> {
     init_tracing();
-    if let Err(err) = ProjectCli::parse().run(app) {
-        error!("{err:#}");
-        std::process::exit(1);
-    }
+    ProjectCli::parse().run(app)
 }
 
 #[cfg(test)]

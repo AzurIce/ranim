@@ -13,10 +13,10 @@ knows how to draw the private output.
 
 `src/main.rs` is the project binary: it assembles the App with
 `ProjectPlugin`, finalizes plugin construction with `app.build()`
-(`ranim::RanimAppExt`), and hands the resulting `ranim::RanimApp` to the
-free function `run_cli` (`ranim::cmd::cli::run_cli`, exported from the
-prelude), which serves the `preview`, `output`, `render`, and `inspect`
-subcommands.
+(`ranim::AppExt`), and hands the resulting `ranim::RanimApp` to the
+free function `ranim::cmd::run_cli`, which serves the `preview`, `output`,
+`render`, `app`, and `inspect` subcommands and returns command errors to the
+caller. The entry point handles the result with `.unwrap()`.
 
 ## Run
 

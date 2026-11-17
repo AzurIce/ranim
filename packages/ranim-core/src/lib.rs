@@ -103,6 +103,11 @@ impl RanimScene {
         self
     }
 
+    /// Get the duration of the root anim node
+    pub fn duration_secs(&self) -> f64 {
+        self.root.duration_secs()
+    }
+
     /// Insert a time mark.
     pub fn insert_time_mark(&mut self, sec: f64, time_mark: TimeMark) {
         self.time_marks.push((sec, time_mark));

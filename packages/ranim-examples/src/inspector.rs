@@ -1,7 +1,7 @@
 //! Browse every bundled example without combining their renderer configurations.
 
 #[cfg(not(target_family = "wasm"))]
-use ranim::{App, AppExt, Plugin, RanimAppExt};
+use ranim::{App, AppExt, Plugin};
 #[cfg(not(target_family = "wasm"))]
 use ranim_examples::*;
 
@@ -39,9 +39,6 @@ fn project() -> ranim::RanimApp {
         composable_choreography,
         ellipse,
         extract_vitem_visualize,
-        getting_started0,
-        getting_started1,
-        getting_started2,
         gltf_showcase,
         hanoi,
         hello_ranim,
@@ -57,7 +54,6 @@ fn project() -> ranim::RanimApp {
         regular_polygon,
         selective_sort,
         solar_system,
-        test,
         tetrahedron_spheres,
         text_item,
         typst_timer,
@@ -69,7 +65,7 @@ fn project() -> ranim::RanimApp {
 #[cfg(not(target_family = "wasm"))]
 fn main() -> anyhow::Result<()> {
     ranim::cmd::cli::init_tracing();
-    ranim::cmd::app::run_app(project())
+    ranim::cmd::run_app(project())
 }
 
 #[cfg(target_family = "wasm")]
@@ -89,5 +85,6 @@ mod tests {
                 .is_some()
         );
         assert!(app.scene("hello_ranim / hello_ranim").is_some());
+        assert!(app.scene("getting_started / hello_ranim").is_none());
     }
 }

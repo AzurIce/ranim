@@ -8,6 +8,7 @@ and lints/documents each supported minimal configuration, then checks WASM hosts
 import os
 from pathlib import Path
 import subprocess
+import tomllib
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,9 +82,17 @@ run([
     "cargo", "clippy", "-p", "ranim", "--examples", "--no-default-features",
     "--features", "anims,cmd-render,typst,gltf", "--", "-D", "warnings",
 ])
+manifest = tomllib.loads((ROOT / "Cargo.toml").read_text())
+metadata = manifest["package"].get("metadata", {}).get("example", {})
+wasm_examples = [
+    flag
+    for example in manifest["example"]
+    if not metadata.get(example["name"], {}).get("standalone", False)
+    for flag in ["--example", example["name"]]
+]
 for features in ["anims,render,typst,gltf", "anims,cmd-preview,typst,gltf"]:
     run([
-        "cargo", "clippy", "-p", "ranim", "--examples", "--no-default-features",
+        "cargo", "clippy", "-p", "ranim", *wasm_examples, "--no-default-features",
         "--target", "wasm32-unknown-unknown", "--features", features,
         "--", "-D", "warnings",
     ])

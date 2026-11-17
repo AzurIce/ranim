@@ -4,10 +4,10 @@ mod scenes;
 fn main() {
     #[cfg(feature = "cmd-render")]
     {
-        use ranim::prelude::*;
+        use ranim::{cmd, prelude::*};
         let mut app = App::new();
         app.add_plugins(scenes::ScenesPlugin);
-        run_cli(app.build());
+        cmd::run_cli(app.build()).unwrap();
     }
     #[cfg(not(feature = "cmd-render"))]
     compile_error!("native examples require the `cmd-render` feature (enabled by default)");

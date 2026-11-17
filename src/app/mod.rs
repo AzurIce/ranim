@@ -1,7 +1,7 @@
 //! Project configuration and scene registration for Ranim.
 //!
 //! A project binary is a [`bevy_app::App`]: plugins register scenes and
-//! resources, then [`RanimAppExt::build`] finalizes plugin construction into a
+//! resources, then [`AppExt::build`] finalizes plugin construction into a
 //! [`RanimApp`] that preview/render/inspect sessions consume.
 
 use std::ops::{Deref, DerefMut};
@@ -35,7 +35,7 @@ pub struct Scenes(Vec<Scene>);
 
 /// A project with plugin construction finalized.
 ///
-/// Produced by [`RanimAppExt::build`], which runs bevy's plugin `finish` and
+/// Produced by [`AppExt::build`], which runs bevy's plugin `finish` and
 /// `cleanup` exactly once. CLI and canvas/interactive preview hosts consume
 /// this project and may install render sub-apps into it. Offline render workers
 /// instead receive a selected [`Scene`] and its rendering configuration.
@@ -63,32 +63,16 @@ impl DerefMut for RanimApp {
     }
 }
 
-/// Finalize a project into a [`RanimApp`].
-pub trait RanimAppExt {
-    /// Run plugin `finish` and `cleanup`, then hand the project to sessions.
+/// Scene registration, selection, and plugin finalization for a project [`App`].
+pub trait AppExt {
+    /// Run plugin `finish` and `cleanup`, then return the finalized [`RanimApp`].
     ///
     /// # Panics
     ///
     /// Panics if plugins are still being added (asynchronous plugin building
     /// has not completed).
-    fn build(&mut self) -> RanimApp;
-}
+    fn build(self) -> RanimApp;
 
-impl RanimAppExt for App {
-    fn build(&mut self) -> RanimApp {
-        assert_eq!(
-            self.plugins_state(),
-            PluginsState::Ready,
-            "plugins must be ready before building a RanimApp"
-        );
-        self.finish();
-        self.cleanup();
-        RanimApp(std::mem::take(self))
-    }
-}
-
-/// Scene registration and selection for a project [`App`].
-pub trait AppExt {
     /// Register a scene without running its constructor.
     ///
     /// # Panics
@@ -121,7 +105,18 @@ pub trait AppExt {
     }
 }
 
-impl AppExt for bevy_app::App {
+impl AppExt for App {
+    fn build(mut self) -> RanimApp {
+        assert_eq!(
+            self.plugins_state(),
+            PluginsState::Ready,
+            "plugins must be ready before building a RanimApp"
+        );
+        self.finish();
+        self.cleanup();
+        RanimApp(self)
+    }
+
     fn add_scene(&mut self, scene: Scene) -> &mut Self {
         let mut scenes = self.world_mut().get_resource_or_init::<Scenes>();
         assert!(

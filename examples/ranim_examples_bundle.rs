@@ -31,12 +31,6 @@ pub mod composable_choreography;
 pub mod ellipse;
 #[path = "extract_vitem_visualize/scenes.rs"]
 pub mod extract_vitem_visualize;
-#[path = "getting_started0/scenes.rs"]
-pub mod getting_started0;
-#[path = "getting_started1/scenes.rs"]
-pub mod getting_started1;
-#[path = "getting_started2/scenes.rs"]
-pub mod getting_started2;
 #[path = "gltf_showcase/scenes.rs"]
 pub mod gltf_showcase;
 #[path = "hanoi/scenes.rs"]
@@ -67,8 +61,6 @@ pub mod regular_polygon;
 pub mod selective_sort;
 #[path = "solar_system/scenes.rs"]
 pub mod solar_system;
-#[path = "test/scenes.rs"]
-pub mod test;
 #[path = "tetrahedron_spheres/scenes.rs"]
 pub mod tetrahedron_spheres;
 #[path = "text_item/scenes.rs"]

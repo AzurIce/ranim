@@ -1,5 +1,3 @@
-use std::f64::consts::PI;
-
 use ranim::{
     anims::{
         creation::{Unwrite, Write},
@@ -19,50 +17,24 @@ use ranim::{
 #[wasm_demo_doc]
 #[output(dir = "./output/hello_ranim")]
 fn hello_ranim(r: &mut RanimScene) {
-    let mut square = Square::new(2.0);
-    square.set_color(manim::BLUE_C);
-
-    let circle: VItem = VItem::from(Circle::new(2.0)).with(|circle| {
-        circle.set_color(manim::RED_C).rotate_on_z(PI / 4.0 - PI);
+    let square = Square::new(2.0).with(|x| {
+        x.set_color(manim::BLUE_C);
     });
+
+    let circle = Circle::new(2.0).with(|x| {
+        x.set_color(manim::RED_C);
+    });
+
+    let mut content = AnimSequence::new();
 
     let mut vitem = VItem::from(square.clone());
-
-    let seq = seq![
-        square.anim_mut(FadeIn).with_rate_func(smooth),
-        vitem.anim_mut(Morph::to(circle)).with_rate_func(smooth),
-        vitem.show(),
-        vitem.anim_ref(Unwrite).with_rate_func(smooth),
-        vitem.anim_mut(Write).with_rate_func(smooth),
-        vitem.anim_mut(FadeOut).with_rate_func(smooth),
-    ];
-    r.play(
-        CameraFrame::default()
-            .show()
-            .with_duration(seq.cursor_sec()),
-    );
-    r.play(seq);
-
-    r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
-}
-
-#[allow(unused)]
-fn hello_ranim_chained(r: &mut RanimScene) {
-    let square = Square::new(2.0).with(|square| {
-        square.set_color(manim::BLUE_C);
-    });
-
-    let mut content = seq![square.anim_ref(FadeIn).with_rate_func(smooth)];
-
-    let circle: VItem = Circle::new(2.0)
-        .with(|circle| {
-            circle.set_color(manim::RED_C);
-        })
-        .into();
-
-    let mut vitem = VItem::from(square);
     content
-        .push(vitem.anim_mut(Morph::to(circle)).with_rate_func(smooth))
+        .push(square.anim_ref(FadeIn).with_rate_func(smooth))
+        .push(
+            vitem
+                .anim_mut(Morph::to(VItem::from(circle)))
+                .with_rate_func(smooth),
+        )
         .hold(1.0)
         .extend(seq![
             vitem.anim_ref(Unwrite).with_rate_func(smooth),

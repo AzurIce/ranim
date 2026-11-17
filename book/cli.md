@@ -7,11 +7,11 @@ WASM 不运行这套 CLI，而由宿主导出 `app() -> WasmApp`，供 JavaScrip
 两种入口与场景库的完整关系见[项目入口](./project-entry.md)。
 
 native 的 `main` 装配 `App` 后用 `app.build()`
-（`RanimAppExt`，prelude 导出）定稿插件构建——断言插件就绪、执行一次
+（`AppExt`，prelude 导出）定稿插件构建——断言插件就绪、执行一次
 bevy 的 `finish()` / `cleanup()`——得到 `ranim::RanimApp`，把它交给自由
-函数 `run_cli`（prelude 导出，native + `cmd-render` feature 门控；命名刻意避开
+函数 `ranim::cmd::run_cli`（native + `cmd-render` feature 门控；命名刻意避开
 bevy App 自带的 `run()` runner 入口）：它安装 tracing、解析进程参数，
-随即分发为四个子命令：
+随即分发子命令，并将命令执行错误通过 `Result<()>` 返回给调用者处理：
 
 ```rust
 use ranim::prelude::*;
@@ -20,7 +20,7 @@ use my_animation::hello; // 场景定义来自本包的 src/lib.rs，也可以�
 fn main() {
     let mut app = App::new();
     app.add_scenes([hello::scene()]);
-    run_cli(app.build());
+    ranim::cmd::run_cli(app.build()).unwrap();
 }
 ```
 
@@ -29,6 +29,7 @@ fn main() {
 ├── preview   启动交互预览 app（需要 cmd-preview feature）
 ├── output    渲染场景声明的所有 #[output(...)]（成片输出）
 ├── render    用默认输出设置快速渲染一个场景一次（冒烟）
+├── app       浏览和检查已注册场景（需要 cmd-app feature）
 └── inspect   不渲染，纯 CPU 检查场景 / 动画树 / 单帧物件
 ```
 
@@ -38,8 +39,8 @@ fn main() {
 cargo run --example <example> -- <command> ...
 ```
 
-默认包含 `cmd-preview`，开启全部四类子命令；关闭 default 并只开启 `cmd-render`
-时，CLI 只提供 `output`、`render` 和 `inspect`，帮助中不显示 preview。
+默认包含 `cmd-preview`，开启全部五类子命令；关闭 default 并只开启 `cmd-render`
+时，CLI 只提供 `output`、`render` 和 `inspect`，帮助中不显示 preview 和 app。
 
 带 `required-features`（如 `typst`、`gltf`）的示例需同时开启对应 feature。
 仓库为 dev profile 开了 `opt-level = 1`、依赖 `opt-level = 3`，`inspect` 是纯
@@ -56,7 +57,7 @@ CPU 查询，渲染也足够快，调试迭代一般不需要 release。
 fn main() {
     let mut app = App::new();
     app.add_scenes([hello::scene()]);
-    run_cli(app.build());
+    ranim::cmd::run_cli(app.build()).unwrap();
 }
 ```
 

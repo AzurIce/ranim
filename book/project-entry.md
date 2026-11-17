@@ -95,7 +95,7 @@ fn project() -> ranim::RanimApp {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    run_cli(project());
+    ranim::cmd::run_cli(project()).unwrap();
 }
 
 // WASM 也编译同一个 binary target；main 不启动 CLI 或事件循环。
@@ -110,8 +110,8 @@ pub fn app() -> ranim::wasm::WasmApp {
 ```
 
 `project()` 是示例自己提取的共享装配函数，名称没有特殊含义。
-`ranim::App` 就是 `bevy_app::App`；prelude 导出的 `AppExt` 提供场景注册和选择方法，
-`RanimAppExt` 提供 `build()`。
+`ranim::App` 就是 `bevy_app::App`；prelude 导出的 `AppExt` 提供场景注册、选择和
+`build()` 方法。
 
 `app.build()` 定稿插件构建，执行一次插件的 `finish()` / `cleanup()`，
 返回会话期项目 `RanimApp`。它不是视频编码或逐帧渲染，也不会把所有场景立即求值。

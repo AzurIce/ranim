@@ -13,7 +13,7 @@
 //!     // cargo run -- preview | output | render hello | inspect scenes
 //!     let mut app = App::new();
 //!     app.add_scenes([hello::scene()]);
-//!     run_cli(app.build());
+//!     ranim::cmd::run_cli(app.build()).unwrap();
 //! }
 //! ```
 //!
@@ -87,8 +87,7 @@ pub mod utils {
 pub mod wasm;
 
 pub use app::{
-    AppExt, Output, OutputFormat, RanimApp, RanimAppExt, Scene, SceneConfig, SceneConstructor,
-    Scenes,
+    AppExt, Output, OutputFormat, RanimApp, Scene, SceneConfig, SceneConstructor, Scenes,
 };
 pub use bevy_app::{App, Plugin};
 pub use bevy_ecs::prelude::Resource;
@@ -100,9 +99,7 @@ pub use ranim_core::{RanimScene, lagged, seq, stack};
 
 /// The preludes
 pub mod prelude {
-    pub use crate::app::{AppExt, RanimAppExt};
-    #[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
-    pub use crate::cmd::cli::run_cli;
+    pub use crate::app::AppExt;
     pub use crate::{App, Plugin};
     pub use ranim_core::prelude::*;
     pub use ranim_core::{lagged, seq, stack};

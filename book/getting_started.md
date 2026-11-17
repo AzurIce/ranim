@@ -1,5 +1,153 @@
 # Getting Started
 
+```rust
+use ranim::prelude::*;
+
+use ranim::{
+    cmd,
+    color::palettes::manim,
+    items::vitem::geometry::{Circle, Square},
+};
+
+#[scene]
+#[output]
+fn hello_ranim(r: &mut RanimScene) {
+    let square = Square::new(2.0).with(|x| {
+        x.set_color(manim::BLUE_C);
+    });
+
+    let circle = Circle::new(2.0).with(|x| {
+        x.set_color(manim::RED_C);
+    });
+
+    r.play(square.show());
+    r.play(circle.show().with_duration(2.0));
+
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(r.duration_secs()),
+    );
+}
+
+fn main() {
+    let mut app = App::new();
+    app.add_scene(hello_ranim::scene());
+    cmd::run_cli(app.build()).unwrap();
+}
+```
+
+Ranim 引擎的扩展与资源组织基于 Bevy 的 App，并通过 `AppExt` trait 提供了一些扩展方法：
+- `fn add_scenes(&mut self, scenes: impl IntoIterator<Item = Scene>) -> &mut Self`
+- `fn build(self) -> RanimApp;`
+- ...
+
+最终产生的 `RanimApp`，由 `ranim::cmd` 下的不同入口来消费：
+- `run_cli(app: RanimApp) -> Result<()>`
+- `fn run_app(app: RanimApp) -> anyhow::Result<()>`
+- ...
+
+使用
+
+```bash
+cargo run --example getting_started -- preview
+```
+
+`App` 是 `bevy_app::App` 的再导出。Ranim 通过 `AppExt` 为它提供场景注册、查询和
+`build()` 方法；`build()` 接管 App，完成插件的 `finish` 和 `cleanup`，返回 `RanimApp`。
+该扩展 trait 由 `ranim::prelude::*` 导入。
+
+`ranim::cmd` 提供 `render_scene`、`preview_scene` 等原生渲染和预览入口。
+`ranim::cmd::run_cli` 负责解析命令行参数并调用对应功能，返回值由调用者处理：
+`cargo run -- preview` 打开预览，`cargo run -- output` 按 `#[output]` 配置导出；
+也可用 `render` 临时渲染单个场景，或用 `inspect` 查询场景、动画树和单帧数据。
+
+`with` 来自 prelude 中的 `With` trait：接管一个值，将它的可变引用传入闭包，
+执行闭包后返回修改后的值。这里先创建物件，再在闭包中设置颜色。
+
+Ranim 用树组织动画：叶节点产生物件状态，组合节点安排子动画的时间。
+定义树中的节点是 `AnimDefNode`，播放前会从定义构建用于求值的 `AnimNode`。
+`RanimScene` 的根是并行容器 `AnimStack`，每次 `r.play(...)` 都向根加入一个子动画：
+
+```text
+AnimStack
+├── square.show()
+├── circle.show().with_duration(2.0)
+└── CameraFrame::default().show().with_duration(2.0)
+```
+
+这三个子动画都从 0 秒开始，而不是依次播放。`show()` 默认时长为零，
+所以正方形只在 0 秒处输出；圆显式显示两秒，使 `r.duration_secs()` 为 2 秒，
+相机再用这个时长覆盖整个场景。
+
+
+```rust
+#[scene]
+#[output]
+fn hello_ranim(r: &mut RanimScene) {
+    let square = Square::new(2.0).with(|x| {
+        x.set_color(manim::BLUE_C);
+    });
+
+    let circle = Circle::new(2.0).with(|x| {
+        x.set_color(manim::RED_C);
+    });
+
+    let mut content = AnimSequence::new();
+
+    let mut vitem = VItem::from(square.clone());
+    content
+        .push(square.anim_ref(FadeIn).with_rate_func(smooth))
+        .push(
+            vitem
+                .anim_mut(Morph::to(VItem::from(circle)))
+                .with_rate_func(smooth),
+        )
+        .hold(1.0)
+        .extend(seq![
+            vitem.anim_ref(Unwrite).with_rate_func(smooth),
+            vitem.anim_mut(Write).with_rate_func(smooth),
+            vitem.anim_mut(FadeOut).with_rate_func(smooth),
+        ]);
+
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
+    r.play(content);
+
+    r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
+}
+```
+
+`anim`、`anim_ref` 和 `anim_mut` 将物件与动画配方绑定，返回保存初始状态和配方的动画定义：
+
+- `anim` 接管物件。
+- `anim_ref` 克隆物件作为初始状态，原变量保持不变。
+- `anim_mut` 先克隆初始状态，再立即把配方终态写回原变量，供后续动画继续使用。
+
+因此，构造 `Morph` 后的 `vitem` 已经是圆，后面的动画都以圆为输入。
+`Unwrite` 使用 `anim_ref` 保留完整的圆，供下一段 `Write` 重绘；
+若用 `anim_mut`，变量会被写回为空路径。`.with_rate_func(smooth)` 设置平滑的进度变化，
+不改变写回时机。
+
+`Morph::to(target)` 在输入与目标之间插值，要求两端具有相同类型并支持对齐和插值。
+这里把 `Square` 和 `Circle` 都转换成 `VItem`，以便在两种形状之间变换。
+“降级为 `VItem`”指将具体几何类型转换为通用矢量路径：保留路径和样式，
+不再保留正方形或圆的专用类型。`Morph` 对齐两端的路径数据，再过渡形状和颜色。
+
+`AnimSequence` 按顺序安排动画：`push` 将动画放到当前游标处，再按时长推进游标；
+`hold(1.0)` 将当前位置的画面保持一秒。`seq![a, b, c]` 是创建顺序容器的简写，
+`extend` 将其中的动画接到 `content` 的末尾。本例依次淡入正方形、变成圆、保持一秒，
+再擦除、重绘并淡出。`content.cursor_sec()` 返回整段序列的时长，供相机使用。
+
+`insert_time_mark` 在场景的指定秒数处添加标记，不推进游标或改变场景时长。
+这里的 `TimeMark::Capture` 声明在第 3.7 秒保存 `preview.png`。
+`output` 命令会在成片渲染完成后采样该时刻并保存截图；`render` 命令不处理截图标记。
+
+---
+
 > [!caution]
 > 本书绝大多数内容目前均由 ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
 
@@ -34,11 +182,11 @@ use my_animation::hello;
 fn main() {
     let mut app = App::new();
     app.add_scenes([hello::scene()]);
-    run_cli(app.build());
+    ranim::cmd::run_cli(app.build()).unwrap();
 }
 ```
 
-`app.build()`（`RanimAppExt`，prelude 已导出）是「构建中的 App → 可开
+`app.build()`（`AppExt`，prelude 已导出）是「构建中的 App → 可开
 会话的项目」的显式转换：断言插件全部就绪（Ready），执行一次 bevy 的
 `finish()` / `cleanup()`，返回 `ranim::RanimApp`。`RanimApp` 是项目的
 会话期形态——`Deref` / `DerefMut` 到 bevy `App`，update、渲染 SubApp
@@ -132,8 +280,8 @@ use ranim::prelude::*;
 fn main() {
     let mut app = App::new();
     app.add_scenes([hello::scene()]);
-    run_cli(app.build());
     // 多个场景：app.add_scenes([first::scene(), second::scene()])
+    ranim::cmd::run_cli(app.build()).unwrap();
 }
 ```
 
@@ -170,7 +318,7 @@ use ranim::prelude::*;
 fn main() {
     let mut app = App::new();
     app.add_plugins(DemoScenesPlugin);
-    run_cli(app.build());
+    ranim::cmd::run_cli(app.build()).unwrap();
 }
 ```
 
@@ -266,11 +414,7 @@ r.play(content);
 | `hold_to(sec)` | 将当前状态保持到指定绝对时间 |
 | `cursor_sec()` | 返回当前 Sequence 时长/cursor |
 
-完整的 show/hide 示例可以直接查看：
-
-```rust
-{{#rustdoc_include ../../examples/getting_started0/scenes.rs:construct}}
-```
+最小完整项目是仓库中的独立示例 `examples/getting_started.rs`；Sequence 的状态切换见下文。
 
 ### `hold` 与 `forward`
 
@@ -340,13 +484,21 @@ r.play(layers);
 有些动画只对更底层的 `VItem` 实现。几何 item 可以通过 `VItem::from` 或 `.into()` 转换：
 
 ```rust
-{{#rustdoc_include ../../examples/getting_started1/scenes.rs:construct}}
+let mut vitem = VItem::from(square);
+content.push(vitem.anim_mut(Morph::to(VItem::from(circle))));
 ```
 
 多个独立 Sequence 的组合示例：
 
 ```rust
-{{#rustdoc_include ../../examples/getting_started2/scenes.rs}}
+let mut square_track = seq![square.show()];
+square_track.hold(2.0);
+
+let mut circle_track = seq![circle.show()];
+circle_track.hold(1.0).push(circle.hide()).hold(1.0);
+
+r.play(square_track);
+r.play(circle_track);
 ```
 
 ## Scene 与 Output 属性
@@ -411,7 +563,7 @@ examples/arc/
 ```
 
 `main.rs` 声明 `mod scenes`。原生 `main()` 创建 App、安装 `scenes::ScenesPlugin`
-后调用 `run_cli(app.build())`；WASM 下则提供空 `main()`，并在同一文件中
+后调用 `ranim::cmd::run_cli(app.build()).unwrap()`；WASM 下则提供空 `main()`，并在同一文件中
 导出 `app()`，使用同一套装配，把定稿后的项目交给 JavaScript：
 
 ```rust
@@ -446,7 +598,7 @@ required-features = ["anims", "render"]
 mod scenes;
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() { /* 创建项目，run_cli(app.build()) */ }
+fn main() { /* 创建项目，ranim::cmd::run_cli(app.build()).unwrap() */ }
 
 #[cfg(target_arch = "wasm32")]
 fn main() {}
@@ -490,9 +642,9 @@ WASM 不自行启动事件循环。每个 `WasmApp` 创建一次预览；需要�
 调用 `app()`。
 
 仓库的 `cargo examples build [EXAMPLES...]` 会完成编译、`wasm-bindgen`
-和 `wasm-opt`。视口与控制条源码分别位于 `website/static/ranim-viewport.js`
-和 `website/static/ranim-controls.js`，由 Notist SSG 直接提供；为 rustdoc 等其他
-输出目录构建时，会把这两个组件及其音频和 timeline 模块复制到输出根目录。
+和 `wasm-opt`。视口与控制条源码分别位于 `web/ranim-viewport.js`
+和 `web/ranim-controls.js`，网站通过 Notist SSG 的 `files` 协议发布这些模块；为 rustdoc 等其他
+输出目录构建时，会从 `web/` 复制这两个组件及其音频、timeline 和主题模块到输出根目录。
 `<ranim-viewport>` 负责 canvas 和播放时钟，`<ranim-controls>` 通过 `for`
 绑定同一 DOM 根中的视口 ID，可放在页面任意位置；同一视口也能绑定多个
 控制条。JavaScript 可以用 `controls.target = viewport` 显式绑定，包括跨
@@ -546,8 +698,8 @@ cargo run -- inspect frame hello --at 1.0
 在本仓库中运行示例：
 
 ```bash
-cargo run --example getting_started0 -- preview
-cargo run --example getting_started0 --no-default-features --features anims,cmd-render -- output
+cargo run --example getting_started -- preview
+cargo run --example getting_started --no-default-features --features anims,cmd-render -- output
 ```
 
 带 `required-features`（如 `typst`、`gltf`）的示例需要同时开启对应 feature。

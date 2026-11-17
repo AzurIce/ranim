@@ -1,6 +1,6 @@
 fn main() {
-    use ranim::prelude::*;
+    use ranim::{cmd, prelude::*};
     let mut app = App::new();
     app.add_plugins(ranim_render_plugin_example::ProjectPlugin);
-    run_cli(app.build());
+    cmd::run_cli(app.build()).unwrap();
 }

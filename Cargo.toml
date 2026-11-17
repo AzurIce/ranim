@@ -199,6 +199,14 @@ pre-release-replacements = [
 
 # MARK: Examples
 [[example]]
+name = "getting_started"
+path = "examples/getting_started.rs"
+required-features = ["anims", "cmd-render"]
+
+[package.metadata.example.getting_started]
+standalone = true
+
+[[example]]
 name = "aabb"
 path = "examples/aabb/main.rs"
 required-features = ["anims", "render"]
@@ -289,36 +297,12 @@ path = "examples/test/main.rs"
 required-features = ["anims", "render"]
 
 [package.metadata.example.test]
-hide = true
+standalone = true
 
 [[example]]
 name = "bubble_sort"
 path = "examples/bubble_sort/main.rs"
 required-features = ["anims", "render"]
-
-[[example]]
-name = "getting_started0"
-path = "examples/getting_started0/main.rs"
-required-features = ["anims", "render"]
-
-[package.metadata.example.getting_started0]
-hide = true
-
-[[example]]
-name = "getting_started1"
-path = "examples/getting_started1/main.rs"
-required-features = ["anims", "render"]
-
-[package.metadata.example.getting_started1]
-hide = true
-
-[[example]]
-name = "getting_started2"
-path = "examples/getting_started2/main.rs"
-required-features = ["anims", "render"]
-
-[package.metadata.example.getting_started2]
-hide = true
 
 [[example]]
 name = "selective_sort"
