@@ -1,9 +1,9 @@
-#import "./lib.notc" as pele;
-= Pele
+#import "./lib.not" as pele;
+# Pele
 
-Pele 使用 Mermaid 图形语法，输出由 CSS 变量控制主题的 SVG。lib.notc 声明块级图形函数：
+Pele 使用 Mermaid 图形语法，输出由 CSS 变量控制主题的 SVG。lib.not 声明块级图形函数：
 
-```notc
+```markdown
 fn diagram(source: String, theme: String = "auto") -> BlockContent;
 ```
 
@@ -15,14 +15,14 @@ source 是图形源码。theme 支持 auto、light、dark；其他值按 auto �
 
 源码错误由 Pele 在组件内显示，并保留上一次成功图形作为淡化预览；修改源码后可恢复。依赖加载失败也显示在组件内。
 
-本函数与 [Mermaid](https://github.com/AzurIce/notist/blob/main/modules/mermaid/README.not) 使用相同签名及 auto / light / dark 主题约定，可作为项目 diagram 声明的 transform 目标。公共调用的源码使用二者共同支持的 Mermaid 语法；项目声明与切换方式见 [Vault 组件示例](https://github.com/AzurIce/notist/blob/main/docs/components/README.not)。
+本函数与 [Mermaid](https://github.com/AzurIce/notist/blob/main/modules/mermaid/README.md) 使用相同签名及 auto / light / dark 主题约定，可作为项目 diagram 声明的 transform 目标。公共调用的源码使用二者共同支持的 Mermaid 语法；项目声明与切换方式见 [Vault 组件示例](https://github.com/AzurIce/notist/blob/main/docs/components/README.md)。
 
-== 使用
+## 使用
 
 Markup 通过相对路径导入，并调用 `#pele.diagram(...)`。Code 使用相同的路径与函数，import 声明和函数调用均不带 `#`。
 
-```not
-#import "../modules/pele/lib.notc" as pele;
+```markdown
+#import "../modules/pele/lib.not" as pele;
 
 #pele.diagram("flowchart LR; Source --> Item")
 ```
@@ -48,29 +48,29 @@ flowchart LR
     evaluate --> result([求值后 Item 树])
 """#)
 
-== 语法与主题
+## 语法与主题
 
 该模块使用 Pele 自身的 Mermaid 语法实现。标签由 SVG text / tspan 呈现，不使用 foreignObject；不能依赖任意 HTML 标签或宿主 CSS 为标签排版。Mermaid 的 theme / themeVariables 配色配置不生效，使用组件 theme 参数或 --pele-* 变量。具体语法差异见 [Pele compatibility](https://pele.run/compatibility)，变量见 [Pele theming](https://pele.run/theming)。
 
 auto 将宿主的 --bg、--fg、--muted、--line、--surface、--code 和 --accent 映射到图形颜色，将 --font-ui / --font-code 映射到图形字体。自定义样式可以按函数属性选择组件：
 
 ```css
-[notist-function$="/pele/lib.notc.diagram"] {
+[notist-function$="/pele/lib.not.diagram"] {
     --pele-accent: #6486d9;
     --pele-radius: 6px;
 }
 ```
 
-== 构建与验证
+## 构建与验证
 
 在仓库根目录执行：
 
 ```sh
-cargo run -p notist-cli -- check modules/pele/README.not
-cargo run -p notist-cli -- html modules/pele/README.not --out-dir target/pele-demo
+cargo run -p notist-cli -- check modules/pele/README.md
+cargo run -p notist-cli -- html modules/pele/README.md --out-dir target/pele-demo
 python3 -m http.server
 ```
 
-通过 HTTP 打开 /target/pele-demo/。Web 预览的资源根使用 ../modules/pele/，输出配置留空，源码路径使用 README.not。组件资源发布与参数协议见 [内容函数与输出绑定](https://github.com/AzurIce/notist/blob/main/docs/designs/content-functions.not)。
+通过 HTTP 打开 /target/pele-demo/。Web 预览的资源根使用 ../modules/pele/，输出配置留空，源码路径使用 README.md。组件资源发布与参数协议见 [内容函数与输出绑定](https://github.com/AzurIce/notist/blob/main/docs/designs/content-functions.md)。
 
 tests/browser.cjs 使用 Playwright 检查发布后的 HTML、中文与长标签、CSS 隔离、主题、窄屏与缩放、更新与重连、错误恢复。先生成 target/pele-demo，再通过 HTTP 服务仓库，并在 NODE_PATH 上提供 Playwright，执行 `node modules/pele/tests/browser.cjs`。NOTIST_TEST_URL 指定服务地址，NOTIST_CHROMIUM 可指定浏览器路径。

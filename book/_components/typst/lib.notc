@@ -1,2 +1,0 @@
-fn math<C: Type = InlineContent>(text: String) -> C;
-fn svg(source: String) -> BlockContent;

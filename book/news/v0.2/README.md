@@ -1,5 +1,5 @@
-#import "../../_components/issue.notc": issue;
-#import "../../_components/pele/lib.notc" as pele;
+#import "../../_components/issue.not": issue;
+#import "../../_components/pele/lib.not" as pele;
 # v0.2
 
 > **Status: Backfilled（补写）** — 覆盖 #issue("99")–#issue("163")；按 v0.2.0（2026-04-05）/ v0.2.1（2026-05-28）发布时点快照描述。

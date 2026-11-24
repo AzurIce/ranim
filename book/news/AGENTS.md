@@ -48,7 +48,7 @@ tag 的源码（`git show v0.X:<path>`）核实 API 断言，**不按当前实�
 
 - **按主题分节**（一个特性或一次架构变更一节），不按 PR 逐条罗列；同一
   主题的多个 PR 在节内合并叙述，节首给出相关 PR 链接。引用使用
-  `#issue("123")`，并导入相对路径的 `_components/issue.notc`；
+  `#issue("123")`，并导入相对路径的 `_components/issue.not`；
   GitHub 将 issue 编号从 `/pull/N` 重定向到 `/issues/N`。
 - 破坏性变更加 `## BREAKING CHANGES` 小节，写清迁移路径，用 before/after
   代码块对照。

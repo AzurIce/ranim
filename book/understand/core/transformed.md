@@ -1,5 +1,5 @@
-#import "../../_components/typst/lib.notc" as typst;
-#import "../../_components/pele/lib.notc" as pele;
+#import "../../_components/typst/lib.not" as typst;
+#import "../../_components/pele/lib.not" as pele;
 # `Transformed<T, G>`：变换表示、组合与物件语义
 
 > [!caution]
@@ -59,7 +59,7 @@ Diag        -> DAffine3
 每个表示都实现同一个 `TransformGroup` 能力，提供单位元和同族组合。组合顺序与
 仿射矩阵一致：
 
-#typst.math<BlockContent>(r#"""
+#typst.math_block(r#"""
 op("compose")(g_2, g_1) = g_2 g_1
 """#)
 
@@ -132,11 +132,11 @@ mesh/surface 场景常用的存储上界。
 
 设 wrapper 当前存储 $F$，新变换为 $H$。两种组合只有乘法方向不同：
 
-#typst.math<BlockContent>(r#"""
+#typst.math_block(r#"""
 F_("outer")' = H F
 """#)
 
-#typst.math<BlockContent>(r#"""
+#typst.math_block(r#"""
 F_("inner")' = F H
 """#)
 

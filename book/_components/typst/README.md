@@ -1,16 +1,16 @@
-#import "./lib.notc" as typst;
-= Typst
+#import "./lib.not" as typst;
+# Typst
 
-modules/typst/ 提供浏览器端的 Typst 数学与通用 SVG 呈现。lib.notc 声明：
+modules/typst/ 提供浏览器端的 Typst 数学与通用 SVG 呈现。lib.not 声明：
 
-```notc
+```markdown
 fn math<C: Type = InlineContent>(text: String) -> C;
 fn svg(source: String) -> BlockContent;
 ```
 
 组件接收不带外围 `$` 的 Typst 数学源码，经 WASM 编译为 SVG。C 是编译期 Type 参数，默认 InlineContent；`<BlockContent>` 显式选择块级结果。它与 notist.math、katex.math 具有相同的调用契约，可直接调用或通过 replace 扩展 替换内置节点。
 
-== 数学
+## 数学
 
 Fraction: #typst.math("frac(a, b)"). Root: #typst.math("sqrt(x^2 + y^2)").
 
@@ -18,13 +18,13 @@ Sum: #typst.math("sum_(i=1)^n i = frac(n(n+1), 2)"). Matrix: #typst.math("mat(1,
 
 块级公式显式选择输出类别：
 
-#typst.math<BlockContent>("sum_(i=1)^n i = frac(n(n+1), 2)")
+#typst.math_block("sum_(i=1)^n i = frac(n(n+1), 2)")
 
 另一个块级实例：
 
-#typst.math<BlockContent>("frac(a, b)")
+#typst.math_block("frac(a, b)")
 
-== 完整 Typst 源码
+## 完整 Typst 源码
 
 typst.svg(source) 接收完整 Typst markup 源码，支持文字、公式、表格、绘图和包导入，返回块级 SVG。默认页面按内容确定尺寸、无页边距、背景透明；默认字号 12pt，正文字体为 Libertinus Serif 与 Noto Serif CJK SC，数学字体为 New Computer Modern Math。源码中的 set 规则可以覆盖这些默认值。多页内容按页纵向呈现；超宽内容随容器等比缩小。
 
@@ -35,7 +35,7 @@ typst.svg(source) 接收完整 Typst markup 源码，支持文字、公式、表
 ]
 """#)
 
-=== Fletcher 绘图
+### Fletcher 绘图
 
 [Fletcher](https://typst.app/universe/package/fletcher/) 是基于 CeTZ 的 Typst 绘图包。源码直接写固定版本 import；节点按行列坐标放置，可以同时固定每列的竖向轴线与同一行的高度：
 
@@ -59,12 +59,12 @@ typst.svg(source) 接收完整 Typst markup 源码，支持文字、公式、表
 
 静态 HTML 导出只发布组件和 Typst 源码，实际编译发生在浏览器。当前入口支持 @preview 包；相对 import、read 和 image 仅能访问编译器已有的虚拟文件，不会自动读取 Notist 项目目录或网页旁的文件。离线部署需另外准备编译器、字体和包资源，并配置本地包加载；当前默认加载方式需要网络。
 
-== 模块使用与输出选择
+## 模块使用与输出选择
 
-本页通过 `#import` 显式导入同目录 lib.notc，使用 typst.math 直接调用。其他项目的 Code 入口显式导入：
+本页通过 `#import` 显式导入同目录 lib.not，使用 typst.math 直接调用。其他项目的 Code 入口显式导入：
 
-```notc
-import "../modules/typst/lib.notc" as typst;
+```markdown
+import "../modules/typst/lib.not" as typst;
 ```
 
 Markup 可以直接写 `#typst.math("x")`。要让内置 math 及 `$...$` 使用此实现，在根 Notist.toml 显式选择同签名映射：
@@ -72,14 +72,14 @@ Markup 可以直接写 `#typst.math("x")`。要让内置 math 及 `$...$` 使用
 ```toml
 [[extensions]]
 kind = "replace"
-imports = { typst = "./lib.notc" }
+imports = { typst = "./lib.not" }
 from = "notist.math"
 to = "typst.math"
 ```
 
-import 不自动启用映射。替换保留原语义身份、公式原文与源码范围，不转换数学方言；Typst 使用 Typst 数学语法，KaTeX 使用 LaTeX。模块规则见 [本地模块](https://github.com/AzurIce/notist/blob/main/docs/modules.not)，映射规则见 [函数映射](https://github.com/AzurIce/notist/blob/main/docs/designs/extensions.not)。
+import 不自动启用映射。替换保留原语义身份、公式原文与源码范围，不转换数学方言；Typst 使用 Typst 数学语法，KaTeX 使用 LaTeX。模块规则见 [本地模块](https://github.com/AzurIce/notist/blob/main/docs/modules.md)，映射规则见 [函数映射](https://github.com/AzurIce/notist/blob/main/docs/designs/extensions.md)。
 
-== 组件实现
+## 组件实现
 
 math/index.js 默认导出 HTMLElement 类；math/compiler.js 负责延迟加载、共享数学编译器和串行编译。公式与 block 参数通过 sys.inputs 传入固定 Typst 模板，公式按 math 模式解析，不拼接到模板源码里；block 为 true 时使用 Typst 的显示公式排版。
 
@@ -91,16 +91,16 @@ SVG 随继承的字号缩放，行内公式通过 Typst 元数据取得基线，
 
 通用 SVG 保留 Typst 指定的排版尺寸，随容器宽度缩小，且渲染高度不超过视口的 85%（保持宽高比，居中显示）；notist-source 属性更新与重连重新编译。源码作为无障碍标签，错误时保留源码并显示诊断；一个编译失败不阻塞其他 SVG。renderedSvg 在当前输入成功绘制且组件连接时返回 SVG，更新中、失败或空输入时返回 null。
 
-== 构建与验证
+## 构建与验证
 
 这个模块无需单独的构建步骤。CLI 发布实际使用的 math/ 和 svg/ 组件目录及各自资源：
 
 ```sh
-cargo run -p notist-cli -- check modules/typst/README.not
-cargo run -p notist-cli -- html modules/typst/README.not --out-dir target/typst-demo
+cargo run -p notist-cli -- check modules/typst/README.md
+cargo run -p notist-cli -- html modules/typst/README.md --out-dir target/typst-demo
 python3 -m http.server
 ```
 
-通过 HTTP 打开 /target/typst-demo/。Web 预览资源根填写 ../modules/typst/，输出配置留空，文档路径填写 README.not。
+通过 HTTP 打开 /target/typst-demo/。Web 预览资源根填写 ../modules/typst/，输出配置留空，文档路径填写 README.md。
 
 浏览器验证使用 modules/typst/tests/browser.cjs 和 modules/typst/tests/svg-browser.cjs，运行前导出上述页面、构建 web/pkg 并通过 HTTP 服务仓库。Playwright 须在 NODE_PATH 上可用；NOTIST_TEST_URL 指定服务地址，NOTIST_CHROMIUM 指定 Chromium 路径。

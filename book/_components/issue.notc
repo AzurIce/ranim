@@ -1,3 +1,0 @@
-fn issue(number: String) -> InlineContent {
-    link(target: "https://github.com/AzurIce/ranim/pull/" + number)[#text(text: "#" + number)]
-}

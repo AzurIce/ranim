@@ -10,12 +10,7 @@ copy_content_assets = false
 exclude = ["**/AGENTS.md", "_components/**"]
 styles = ["version-select.css"]
 scripts = ["version-select.js"]
+math_component = "_components/typst/math"
 
 [site.extensions.builtins.book]
 select = true
-
-[[extensions]]
-kind = "replace"
-imports = { typst = "_components/typst/lib.notc" }
-from = "notist.math"
-to = "typst.math"

@@ -1,5 +1,5 @@
-#import "../../_components/issue.notc": issue;
-#import "../../_components/pele/lib.notc" as pele;
+#import "../../_components/issue.not": issue;
+#import "../../_components/pele/lib.not" as pele;
 # v0.3
 
 > **Status: Draft** — 随 main 更新，v0.3 发布时冻结。
